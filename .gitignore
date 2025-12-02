@@ -41,6 +41,7 @@ indicators_backup.py
 # Documentation
 *.md
 !README.md
+!DEPLOYMENT_GUIDE.md
 
 # IDE
 .vscode/
