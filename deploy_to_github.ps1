@@ -1,16 +1,16 @@
 # Quick GitHub Setup Script
 # Run this to push your code to GitHub
 
-Write-Host "🚀 Sigma Scanner - GitHub Deployment Script" -ForegroundColor Green
+Write-Host "🚀 Investing Scanner - GitHub Deployment Script" -ForegroundColor Green
 Write-Host "==========================================" -ForegroundColor Green
 Write-Host ""
 
 # Get GitHub username and repo name
 $username = Read-Host "Enter your GitHub username"
-$reponame = Read-Host "Enter repository name (default: sigma-scanner-replica)"
+$reponame = Read-Host "Enter repository name (default: investing-scanner)"
 
 if ([string]::IsNullOrWhiteSpace($reponame)) {
-    $reponame = "sigma-scanner-replica"
+    $reponame = "investing-scanner"
 }
 
 $remote_url = "https://github.com/$username/$reponame.git"

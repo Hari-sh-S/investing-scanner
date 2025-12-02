@@ -2,7 +2,7 @@
 
 ## ✅ What's Been Done
 
-Your Sigma Scanner Replica is ready for deployment! Here's what has been set up:
+Your Investing Scanner is ready for deployment! Here's what has been set up:
 
 ### 1. Git Repository Initialized
 - ✅ Local Git repository created
@@ -29,7 +29,7 @@ Your Sigma Scanner Replica is ready for deployment! Here's what has been set up:
 
 #### Step 1: Create GitHub Repository
 1. Go to https://github.com/new
-2. Repository name: `sigma-scanner-replica`
+2. Repository name: `investing-scanner`
 3. **Don't** initialize with README
 4. Click **Create repository**
 
@@ -38,7 +38,7 @@ Run these commands in PowerShell:
 
 ```powershell
 cd "c:\Users\haris\OneDrive\Project Fetch\claude investing"
-git remote add origin https://github.com/YOUR_USERNAME/sigma-scanner-replica.git
+git remote add origin https://github.com/YOUR_USERNAME/investing-scanner.git
 git branch -M main
 git push -u origin main
 ```
@@ -49,7 +49,7 @@ git push -u origin main
 1. Go to https://streamlit.io/cloud
 2. Sign in with GitHub
 3. Click **New app**
-4. Select your repository: `sigma-scanner-replica`
+4. Select your repository: `investing-scanner`
 5. Main file: `app.py`
 6. Click **Deploy**
 
@@ -77,7 +77,7 @@ After that, follow Step 3 from Option A above.
 ## 📁 Project Structure
 
 ```
-sigma-scanner-replica/
+investing-scanner/
 ├── .streamlit/
 │   └── config.toml          # Streamlit configuration
 ├── .gitignore               # Git ignore rules

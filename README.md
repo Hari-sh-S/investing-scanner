@@ -1,4 +1,4 @@
-# 📊 Sigma Scanner Replica
+# 📊 Investing Scanner
 
 An advanced backtesting platform for the Indian Stock Market, built with Streamlit. Analyze portfolios, test strategies, and optimize your trading approach using real NSE data.
 
@@ -36,8 +36,8 @@ An advanced backtesting platform for the Indian Stock Market, built with Streaml
 
 1. **Clone the repository**
 ```bash
-git clone https://github.com/YOUR_USERNAME/sigma-scanner-replica.git
-cd sigma-scanner-replica
+git clone https://github.com/YOUR_USERNAME/investing-scanner.git
+cd investing-scanner
 ```
 
 2. **Install dependencies**
@@ -54,7 +54,7 @@ The app will open in your default browser at `http://localhost:8501`
 
 ## 🌐 Live Demo
 
-Visit the live application: [Sigma Scanner Replica on Streamlit Cloud](https://YOUR_APP_URL.streamlit.app)
+Visit the live application: [Investing Scanner on Streamlit Cloud](https://YOUR_APP_URL.streamlit.app)
 
 ## 🎯 Quick Start
 
@@ -86,7 +86,7 @@ Visit the live application: [Sigma Scanner Replica on Streamlit Cloud](https://Y
 ## 📁 Project Structure
 
 ```
-sigma-scanner-replica/
+investing-scanner/
 ├── app.py                    # Main Streamlit application
 ├── engine.py                 # Core backtesting logic
 ├── portfolio_engine.py       # Portfolio management and rebalancing
@@ -153,7 +153,6 @@ This project is for educational purposes. Please ensure compliance with data pro
 
 ## 🙏 Acknowledgments
 
-- Inspired by Sigma Scanner's portfolio backtesting capabilities
 - Built for the Indian stock market community
 - Data sourced from Yahoo Finance and NSE India
 

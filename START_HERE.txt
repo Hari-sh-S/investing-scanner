@@ -1,5 +1,5 @@
 ================================================================
-   SIGMA SCANNER REPLICA - DEPLOYMENT INSTRUCTIONS
+   INVESTING SCANNER - DEPLOYMENT INSTRUCTIONS
 ================================================================
 
 🎯 YOUR MISSION: Get this app live on the internet!
@@ -17,7 +17,7 @@ STEP 1: CREATE GITHUB REPOSITORY
 1. Open your browser and go to: https://github.com/new
 
 2. Fill in these details:
-   Repository name: sigma-scanner-replica
+   Repository name: investing-scanner
    Description: Advanced Backtesting Platform for Indian Stock Market
    Visibility: ✓ Public (or Private if you prefer)
    
@@ -39,7 +39,7 @@ STEP 2: PUSH YOUR CODE TO GITHUB
 
    cd "c:\Users\haris\OneDrive\Project Fetch\claude investing"
 
-   git remote add origin https://github.com/YOUR_USERNAME/sigma-scanner-replica.git
+   git remote add origin https://github.com/YOUR_USERNAME/investing-scanner.git
 
    git branch -M main
 
@@ -47,7 +47,7 @@ STEP 2: PUSH YOUR CODE TO GITHUB
 
    ⚠️ REPLACE "YOUR_USERNAME" with your actual GitHub username!
       For example, if your username is "johnsmith", use:
-      git remote add origin https://github.com/johnsmith/sigma-scanner-replica.git
+      git remote add origin https://github.com/johnsmith/investing-scanner.git
 
 4. If prompted, enter your GitHub credentials
 
@@ -65,10 +65,10 @@ STEP 3: DEPLOY TO STREAMLIT CLOUD (FREE HOSTING)
 5. Once logged in, click "New app" button
 
 6. Fill in the form:
-   Repository:    YOUR_USERNAME/sigma-scanner-replica
+   Repository:    YOUR_USERNAME/investing-scanner
    Branch:        main
    Main file:     app.py
-   App URL:       Choose a name (e.g., sigma-scanner-replica)
+   App URL:       Choose a name (e.g., investing-scanner)
 
 7. Click "Deploy!"
 

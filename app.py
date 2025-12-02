@@ -16,7 +16,7 @@ from pathlib import Path
 
 # Page config
 st.set_page_config(
-    page_title="Sigma Scanner Replica",
+    page_title="Investing Scanner",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
@@ -182,7 +182,7 @@ def create_excel_download(config, metrics, engine=None):
 # Header
 col_title, col_actions = st.columns([3, 1])
 with col_title:
-    st.title("Sigma Scanner Replica")
+    st.title("Investing Scanner")
     st.caption("Advanced Backtesting for Indian Stock Market")
 
 st.markdown("---")

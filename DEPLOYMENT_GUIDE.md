@@ -1,6 +1,6 @@
 # 🚀 Deployment Guide
 
-This guide will walk you through deploying your Sigma Scanner Replica to GitHub and hosting it on Streamlit Cloud (free).
+This guide will walk you through deploying your Investing Scanner to GitHub and hosting it on Streamlit Cloud (free).
 
 ## Part 1: Deploy to GitHub
 
@@ -9,7 +9,7 @@ This guide will walk you through deploying your Sigma Scanner Replica to GitHub 
 1. Go to [GitHub](https://github.com) and sign in
 2. Click the **"+"** icon in the top right → **"New repository"**
 3. Fill in the details:
-   - **Repository name**: `sigma-scanner-replica` (or your preferred name)
+   - **Repository name**: `investing-scanner` (or your preferred name)
    - **Description**: "Advanced Backtesting Platform for Indian Stock Market"
    - **Visibility**: Choose **Public** or **Private**
    - **DO NOT** initialize with README, .gitignore, or license (we already have these)
@@ -21,7 +21,7 @@ GitHub will show you instructions, but here's what you need to run:
 
 ```bash
 # Add the GitHub repository as remote
-git remote add origin https://github.com/YOUR_USERNAME/sigma-scanner-replica.git
+git remote add origin https://github.com/YOUR_USERNAME/investing-scanner.git
 
 # Push your code
 git branch -M main
@@ -57,10 +57,10 @@ git push -u origin main
 2. Click **"New app"** button
 3. Fill in the deployment form:
 
-   **Repository**: `YOUR_USERNAME/sigma-scanner-replica`  
+   **Repository**: `YOUR_USERNAME/investing-scanner`  
    **Branch**: `main`  
    **Main file path**: `app.py`  
-   **App URL**: Choose a custom URL (e.g., `sigma-scanner-replica`)
+   **App URL**: Choose a custom URL (e.g., `investing-scanner`)
 
 4. Click **"Deploy!"**
 
@@ -80,7 +80,7 @@ Once deployed, your app will be available at:
 https://YOUR_APP_NAME.streamlit.app
 ```
 
-Example: `https://sigma-scanner-replica.streamlit.app`
+Example: `https://investing-scanner.streamlit.app`
 
 ---
 
@@ -192,10 +192,10 @@ Streamlit Cloud has ephemeral storage. Consider:
 
 ## 🎉 Congratulations!
 
-Your Sigma Scanner Replica is now live and accessible to anyone with the URL!
+Your Investing Scanner is now live and accessible to anyone with the URL!
 
 ### Share Your App:
-- **GitHub**: `https://github.com/YOUR_USERNAME/sigma-scanner-replica`
+- **GitHub**: `https://github.com/YOUR_USERNAME/investing-scanner`
 - **Live App**: `https://YOUR_APP_NAME.streamlit.app`
 
 ### Next Steps:
