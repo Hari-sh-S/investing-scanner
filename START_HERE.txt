@@ -1,0 +1,179 @@
+================================================================
+   SIGMA SCANNER REPLICA - DEPLOYMENT INSTRUCTIONS
+================================================================
+
+🎯 YOUR MISSION: Get this app live on the internet!
+
+📋 WHAT YOU NEED:
+   - GitHub account (free - sign up at github.com)
+   - 10 minutes of your time
+
+================================================================
+           STEP-BY-STEP DEPLOYMENT GUIDE
+================================================================
+
+STEP 1: CREATE GITHUB REPOSITORY
+--------------------------------
+1. Open your browser and go to: https://github.com/new
+
+2. Fill in these details:
+   Repository name: sigma-scanner-replica
+   Description: Advanced Backtesting Platform for Indian Stock Market
+   Visibility: ✓ Public (or Private if you prefer)
+   
+   ⚠️ IMPORTANT: Do NOT check any of these boxes:
+      □ Add a README file
+      □ Add .gitignore
+      □ Choose a license
+   
+3. Click the green "Create repository" button
+
+
+STEP 2: PUSH YOUR CODE TO GITHUB
+---------------------------------
+1. GitHub will show you some commands. IGNORE those for now.
+
+2. Open PowerShell (Windows Key + X, then select "Windows PowerShell")
+
+3. Copy and paste these commands ONE BY ONE:
+
+   cd "c:\Users\haris\OneDrive\Project Fetch\claude investing"
+
+   git remote add origin https://github.com/YOUR_USERNAME/sigma-scanner-replica.git
+
+   git branch -M main
+
+   git push -u origin main
+
+   ⚠️ REPLACE "YOUR_USERNAME" with your actual GitHub username!
+      For example, if your username is "johnsmith", use:
+      git remote add origin https://github.com/johnsmith/sigma-scanner-replica.git
+
+4. If prompted, enter your GitHub credentials
+
+
+STEP 3: DEPLOY TO STREAMLIT CLOUD (FREE HOSTING)
+-------------------------------------------------
+1. Go to: https://streamlit.io/cloud
+
+2. Click "Sign up" or "Sign in"
+
+3. Sign in using your GitHub account (click the GitHub button)
+
+4. Authorize Streamlit to access your repositories
+
+5. Once logged in, click "New app" button
+
+6. Fill in the form:
+   Repository:    YOUR_USERNAME/sigma-scanner-replica
+   Branch:        main
+   Main file:     app.py
+   App URL:       Choose a name (e.g., sigma-scanner-replica)
+
+7. Click "Deploy!"
+
+8. Wait 2-5 minutes while Streamlit builds your app
+   (You'll see build logs - this is normal)
+
+9. Done! Your app is now LIVE! 🎉
+
+
+================================================================
+                    YOUR LIVE APP URL
+================================================================
+
+After deployment, your app will be available at:
+
+   https://YOUR_APP_NAME.streamlit.app
+
+Share this URL with anyone!
+
+================================================================
+                  ALTERNATIVE: USE THE SCRIPT
+================================================================
+
+We've created an automated script to handle Step 2 for you!
+
+To use it:
+1. Open PowerShell
+2. Run: cd "c:\Users\haris\OneDrive\Project Fetch\claude investing"
+3. Run: .\deploy_to_github.ps1
+4. Follow the prompts
+5. Then continue with Step 3 above
+
+================================================================
+                    TROUBLESHOOTING
+================================================================
+
+❌ "git: command not found"
+   → Install Git from: https://git-scm.com/download/win
+   → Restart PowerShell after installation
+
+❌ "Permission denied" when pushing
+   → Check your GitHub username is correct
+   → You may need to set up SSH keys or use a Personal Access Token
+   → See: https://docs.github.com/en/authentication
+
+❌ Streamlit deployment fails
+   → Check the build logs in Streamlit Cloud dashboard
+   → Most common issue: Missing dependencies (already handled)
+   → Contact us if you need help!
+
+================================================================
+                   IMPORTANT NOTES
+================================================================
+
+⚠️ Data Persistence:
+   - Streamlit Cloud uses ephemeral storage
+   - Data cache resets when app sleeps
+   - Users need to download data again after inactivity
+   - This is normal for free hosting!
+
+💡 Free Tier Limits:
+   - 1 GB RAM (sufficient for most backtests)
+   - 1 CPU core
+   - App sleeps after 7 days of inactivity
+   - Wakes up automatically when someone visits
+
+🔄 Updating Your App:
+   After deployment, any changes you push to GitHub
+   will automatically redeploy your app!
+   
+   Commands to update:
+   git add .
+   git commit -m "Your update message"
+   git push
+
+================================================================
+                    NEXT STEPS
+================================================================
+
+After deployment:
+□ Star your own repository on GitHub ⭐
+□ Test all features on the live app
+□ Share the URL with friends
+□ Update README.md with your live app link
+□ Join Streamlit community: discuss.streamlit.io
+
+================================================================
+                  NEED MORE HELP?
+================================================================
+
+📖 Read the detailed guides:
+   - DEPLOYMENT_GUIDE.md
+   - DEPLOYMENT_SUMMARY.md
+   - README.md
+
+🌐 Resources:
+   - Streamlit Docs: https://docs.streamlit.io/
+   - GitHub Docs: https://docs.github.com/
+   - Community: https://discuss.streamlit.io/
+
+================================================================
+
+🎉 You're all set! Follow the steps above and you'll have
+   your Sigma Scanner Replica live in under 10 minutes!
+
+   Good luck! 🚀
+
+================================================================
