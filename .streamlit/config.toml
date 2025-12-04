@@ -1,8 +1,3 @@
-[theme]
-primaryColor = "#28a745"
-font = "sans serif"
-base = "light"
-
 [server]
 headless = true
 port = 8501
