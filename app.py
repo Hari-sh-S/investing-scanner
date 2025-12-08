@@ -221,6 +221,9 @@ with main_tabs[0]:
         exit_rank = st.number_input("Exit Rank*", num_stocks, 200, num_stocks * 2, 
                                     help="Stocks will exit if they fall below this rank. Should be > Portfolio Size")
         
+        reinvest_profits = st.checkbox("Reinvest Profits", value=True,
+                                       help="If enabled, reinvest starting capital + profits. If disabled, only reinvest initial capital amount.")
+        
         st.markdown("**Time Period**")
         start_date = st.date_input("Start Date", datetime.date(2020, 1, 1))
         end_date = st.date_input("End Date", datetime.date.today())
@@ -402,7 +405,8 @@ with main_tabs[0]:
                             exit_rank,
                             rebal_config,
                             regime_config,
-                            uncorrelated_config
+                            uncorrelated_config,
+                            reinvest_profits
                         )
                         metrics = engine.get_metrics()
                     
