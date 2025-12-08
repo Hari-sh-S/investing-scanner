@@ -292,7 +292,11 @@ class PortfolioEngine:
         if regime_type == 'EMA':
             ema_period = regime_config['value']
             ema_col = f'EMA_{ema_period}'
-            if ema_col in row and row['Close'] < row.get(ema_col, 0):
+            close_price = row.get('Close', 0)
+            ema_value = row.get(ema_col, 0)
+            triggered = close_price < ema_value
+            print(f"DEBUG Regime [{date}]: Close={close_price:.2f}, {ema_col}={ema_value:.2f}, Triggered={triggered}")
+            if ema_col in row and triggered:
                 return True, regime_config['action']
         
         elif regime_type == 'MACD':
