@@ -482,6 +482,13 @@ class PortfolioEngine:
                 # stocks_target is now the amount available for stocks
                 available_for_stocks = stocks_target
                 
+                # DEBUG: Print allocation values
+                print(f"\nDEBUG [{date}]: Allocations")
+                print(f"  Investable Capital: Rs {investable_capital:,.0f}")
+                print(f"  Stocks Target: Rs {stocks_target:,.0f}")
+                print(f"  Uncorrelated Target: Rs {uncorrelated_target:,.0f}")
+                print(f"  Available for Stocks: Rs {available_for_stocks:,.0f}")
+                
                 # Calculate scores for all stocks - OPTIMIZED VECTORIZED VERSION
                 # Exclude uncorrelated asset from stock scoring
                 scores = {}
@@ -517,6 +524,10 @@ class PortfolioEngine:
                 
                 # Rank stocks
                 ranked_stocks = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+                
+                # DEBUG: Print stock selection info
+                print(f"  Stocks Scored: {len(scores)}")
+                print(f"  Top Stocks Selected: {len(ranked_stocks[:num_stocks])}")
                 
                 # Select top N stocks
                 top_stocks = ranked_stocks[:num_stocks]
