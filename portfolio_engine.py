@@ -450,8 +450,9 @@ class PortfolioEngine:
                 # Check regime filter ONLY on rebalance day
                 regime_triggered, regime_action = self._check_regime_filter(date, regime_config, realized_pnl_running)
                 
-                # Calculate available cash for stocks (investable capital - uncorrelated allocation)
-                available_for_stocks = investable_capital - uncorrelated_cash_allocated
+                # Calculate available cash for stocks (actual remaining cash, not theoretical)
+                # After uncorrelated purchase, cash has been reduced
+                available_for_stocks = float(cash)
                 
                 # Calculate scores for all stocks - OPTIMIZED VECTORIZED VERSION
                 scores = {}
