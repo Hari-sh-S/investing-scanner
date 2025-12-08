@@ -292,8 +292,11 @@ class PortfolioEngine:
         if regime_type == 'EMA':
             ema_period = regime_config['value']
             ema_col = f'EMA_{ema_period}'
-            close_price = row.get('Close', 0)
-            ema_value = row.get(ema_col, 0)
+            close_val = row.get('Close', 0)
+            ema_val = row.get(ema_col, 0)
+            # Extract scalar if Series
+            close_price = float(close_val.iloc[0]) if hasattr(close_val, 'iloc') else float(close_val)
+            ema_value = float(ema_val.iloc[0]) if hasattr(ema_val, 'iloc') else float(ema_val)
             triggered = close_price < ema_value
             print(f"DEBUG Regime [{date}]: Close={close_price:.2f}, {ema_col}={ema_value:.2f}, Triggered={triggered}")
             if ema_col in row and triggered:
