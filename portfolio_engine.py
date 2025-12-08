@@ -308,7 +308,7 @@ class PortfolioEngine:
         return False, 'none'
 
     def run_rebalance_strategy(self, scoring_formula, num_stocks, exit_rank, 
-                              rebal_config, regime_config=None, uncorrelated_config=None):
+                              rebal_config, regime_config=None, uncorrelated_config=None, reinvest_profits=True):
         """
         Advanced backtesting engine with all Sigma Scanner features.
         """
