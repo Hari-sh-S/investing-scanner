@@ -268,6 +268,7 @@ class PortfolioEngine:
     def _check_regime_filter(self, date, regime_config, realized_pnl=0):
         """Check if regime filter is triggered."""
         if not regime_config:
+            print(f"DEBUG Regime [{date}]: No regime_config, returning False")
             return False, 'none'  # No filter active
         
         regime_type = regime_config['type']
@@ -282,9 +283,11 @@ class PortfolioEngine:
         
         # For EMA, MACD, SUPERTREND - need index data
         if self.regime_index_data is None or self.regime_index_data.empty:
+            print(f"DEBUG Regime [{date}]: No regime_index_data, returning False")
             return False, 'none'
         
         if date not in self.regime_index_data.index:
+            print(f"DEBUG Regime [{date}]: Date not in index (index has {len(self.regime_index_data)} rows), returning False")
             return False, 'none'
         
         row = self.regime_index_data.loc[date]
