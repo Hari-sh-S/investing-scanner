@@ -410,7 +410,6 @@ class PortfolioEngine:
                 regime_triggered, regime_action = self._check_regime_filter(date, regime_config, realized_pnl_running)
                 
                 # Calculate allocations based on regime filter + uncorrelated interaction
-                # Uncorrelated allocation should respect regime limits
                 stocks_target = 0.0
                 uncorrelated_target = 0.0
                 
@@ -424,15 +423,12 @@ class PortfolioEngine:
                         regime_active = True
                         
                     elif regime_action == 'Half Portfolio':
-                        # 50% available for deployment, split between stocks and uncorrelated
-                        available_funds = investable_capital * 0.5
+                        # ALWAYS 50% to stocks, uncorrelated from remaining 50%
+                        stocks_target = investable_capital * 0.5
                         if uncorrelated_config:
                             allocation_pct = uncorrelated_config['allocation_pct'] / 100.0
-                            uncorrelated_target = available_funds * allocation_pct
-                            stocks_target = available_funds - uncorrelated_target
-                        else:
-                            uncorrelated_target = 0.0
-                            stocks_target = available_funds
+                            # Uncorrelated from the OTHER 50% (cash reserve)
+                            uncorrelated_target = (investable_capital * 0.5) * allocation_pct
                         regime_active = True
                 else:
                     # No regime active - use all investable capital
