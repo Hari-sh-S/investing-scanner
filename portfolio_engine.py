@@ -377,9 +377,6 @@ class PortfolioEngine:
         for date in all_dates:
             is_rebalance = date in rebalance_dates
             
-            # Check regime filter
-            regime_triggered, regime_action = self._check_regime_filter(date, regime_config, realized_pnl_running)
-            
             if is_rebalance:
                 # Sell all current holdings
                 for ticker, shares in holdings.items():
@@ -399,60 +396,22 @@ class PortfolioEngine:
                 
                 holdings = {}
                 
-                # Calculate allocations based on regime filter + uncorrelated asset combination
-                total_funds = float(cash)
-                stocks_allocation = 0.0
-                uncorrelated_allocation = 0.0
-                cash_reserve = 0.0
-                
-                if regime_triggered:
-                    if regime_action == 'Go Cash':
-                        # 0% stocks, uncorrelated from total funds, rest to cash
-                        stocks_allocation = 0.0
-                        if uncorrelated_config:
-                            allocation_pct = uncorrelated_config['allocation_pct'] / 100.0
-                            uncorrelated_allocation = total_funds * allocation_pct
-                            cash_reserve = total_funds - uncorrelated_allocation
-                        else:
-                            uncorrelated_allocation = 0.0
-                            cash_reserve = total_funds
-                        
-                        regime_active = True
-                        regime_cash_reserve = cash_reserve
-                        
-                    elif regime_action == 'Half Portfolio':
-                        # 50% available, split between stocks and uncorrelated
-                        available_funds = total_funds * 0.5
-                        cash_reserve = total_funds * 0.5
-                        
-                        if uncorrelated_config:
-                            # Uncorrelated gets allocation_pct of the AVAILABLE 50%
-                            allocation_pct = uncorrelated_config['allocation_pct'] / 100.0
-                            uncorrelated_allocation = available_funds * allocation_pct
-                            stocks_allocation = available_funds - uncorrelated_allocation
-                        else:
-                            uncorrelated_allocation = 0.0
-                            stocks_allocation = available_funds
-                        
-                        regime_active = True
-                        regime_cash_reserve = cash_reserve
+                # Apply reinvest option
+                if reinvest_profits:
+                    # Use all available cash (capital + profits)
+                    investable_capital = float(cash)
                 else:
-                    # No regime filter active - use all funds
-                    regime_active = False
-                    regime_cash_reserve = 0.0
-                    
-                    if uncorrelated_config:
-                        allocation_pct = uncorrelated_config['allocation_pct'] / 100.0
-                        uncorrelated_allocation = total_funds * allocation_pct
-                        stocks_allocation = total_funds - uncorrelated_allocation
-                    else:
-                        uncorrelated_allocation = 0.0
-                        stocks_allocation = total_funds
+                    # Cap at initial capital only
+                    investable_capital = min(float(cash), self.initial_capital)
                 
                 
-                # Execute uncorrelated asset purchase
-                if uncorrelated_config and uncorrelated_allocation > 0:
+                
+                # Handle uncorrelated asset allocation (independent of regime)
+                uncorrelated_cash_allocated = 0.0
+                if uncorrelated_config:
+                    allocation_pct = uncorrelated_config['allocation_pct'] / 100.0
                     uncorrelated_asset = uncorrelated_config['asset']
+                    uncorrelated_cash_allocated = investable_capital * allocation_pct
                     
                     # Download uncorrelated asset data if not in universe
                     if uncorrelated_asset not in self.data:
@@ -470,7 +429,7 @@ class PortfolioEngine:
                     # Buy uncorrelated asset
                     if uncorrelated_asset in self.data and date in self.data[uncorrelated_asset].index:
                         unc_price = self._get_scalar(self.data[uncorrelated_asset].loc[date, 'Close'])
-                        unc_shares = int(uncorrelated_allocation / unc_price)
+                        unc_shares = int(uncorrelated_cash_allocated / unc_price)
                         
                         if unc_shares > 0:
                             unc_cost = unc_shares * unc_price
@@ -487,6 +446,12 @@ class PortfolioEngine:
                                 'Score': 0,
                                 'Rank': 'Uncorrelated'
                             })
+                
+                # Check regime filter ONLY on rebalance day
+                regime_triggered, regime_action = self._check_regime_filter(date, regime_config, realized_pnl_running)
+                
+                # Calculate available cash for stocks (investable capital - uncorrelated allocation)
+                available_for_stocks = investable_capital - uncorrelated_cash_allocated
                 
                 # Calculate scores for all stocks - OPTIMIZED VECTORIZED VERSION
                 scores = {}
@@ -520,15 +485,34 @@ class PortfolioEngine:
                 ranked_stocks = sorted(scores.items(), key=lambda x: x[1], reverse=True)
                 
                 # Select top N stocks
-                top_stocks = ranked_stocks[:num_stocks] if stocks_allocation > 0 else []
+                top_stocks = ranked_stocks[:num_stocks]
                 
-                # Buy top stocks (with calculated stocks allocation)
-                if top_stocks and stocks_allocation > 0:
-                    position_value = stocks_allocation / len(top_stocks)
+                # Determine stock purchase multiplier based on regime
+                stock_purchase_multiplier = 1.0  # Default: buy full positions
+                
+                if regime_triggered:
+                    if regime_action == 'Go Cash':
+                        # Don't buy any stocks
+                        stock_purchase_multiplier = 0.0
+                        regime_active = True
+                    elif regime_action == 'Half Portfolio':
+                        # Buy only half of each position
+                        stock_purchase_multiplier = 0.5
+                        regime_active = True
+                else:
+                    regime_active = False
+                
+                # Calculate total available for stock purchases  
+                investable_cash = available_for_stocks
+                
+                # Buy top stocks (with regime multiplier)
+                if top_stocks and stock_purchase_multiplier > 0 and investable_cash > 0:
+                    intended_position_value = investable_cash / len(top_stocks)
+                    actual_position_value = intended_position_value * stock_purchase_multiplier
                     
                     for ticker, score in top_stocks:
                         buy_price = self._get_scalar(self.data[ticker].loc[date, 'Close'])
-                        shares = int(position_value / buy_price)
+                        shares = int(actual_position_value / buy_price)
                         
                         if shares > 0:
                             cost = shares * buy_price
