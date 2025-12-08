@@ -399,34 +399,60 @@ class PortfolioEngine:
                 
                 holdings = {}
                 
-                # Handle regime filter
-                investable_cash = float(cash)  # Ensure scalar
+                # Calculate allocations based on regime filter + uncorrelated asset combination
+                total_funds = float(cash)
+                stocks_allocation = 0.0
+                uncorrelated_allocation = 0.0
+                cash_reserve = 0.0
+                
                 if regime_triggered:
                     if regime_action == 'Go Cash':
+                        # 0% stocks, uncorrelated from total funds, rest to cash
+                        stocks_allocation = 0.0
+                        if uncorrelated_config:
+                            allocation_pct = uncorrelated_config['allocation_pct'] / 100.0
+                            uncorrelated_allocation = total_funds * allocation_pct
+                            cash_reserve = total_funds - uncorrelated_allocation
+                        else:
+                            uncorrelated_allocation = 0.0
+                            cash_reserve = total_funds
+                        
                         regime_active = True
-                        regime_cash_reserve = float(cash)
-                        investable_cash = 0.0
+                        regime_cash_reserve = cash_reserve
+                        
                     elif regime_action == 'Half Portfolio':
+                        # 50% available, split between stocks and uncorrelated
+                        available_funds = total_funds * 0.5
+                        cash_reserve = total_funds * 0.5
+                        
+                        if uncorrelated_config:
+                            # Uncorrelated gets allocation_pct of the AVAILABLE 50%
+                            allocation_pct = uncorrelated_config['allocation_pct'] / 100.0
+                            uncorrelated_allocation = available_funds * allocation_pct
+                            stocks_allocation = available_funds - uncorrelated_allocation
+                        else:
+                            uncorrelated_allocation = 0.0
+                            stocks_allocation = available_funds
+                        
                         regime_active = True
-                        regime_cash_reserve = float(cash) * 0.5
-                        investable_cash = float(cash) * 0.5
+                        regime_cash_reserve = cash_reserve
                 else:
-                    # Release regime cash if filter cleared
-                    if regime_active:
-                        investable_cash = float(cash)
-                        regime_active = False
-                        regime_cash_reserve = 0.0
-                
-                
-                # Handle uncorrelated asset allocation
-                uncorrelated_cash = 0.0
-                if uncorrelated_config and investable_cash > 0:
-                    allocation_pct = uncorrelated_config['allocation_pct'] / 100.0
-                    uncorrelated_asset = uncorrelated_config['asset']
+                    # No regime filter active - use all funds
+                    regime_active = False
+                    regime_cash_reserve = 0.0
                     
-                    # Allocate percentage to uncorrelated asset
-                    uncorrelated_cash = investable_cash * allocation_pct
-                    investable_cash -= uncorrelated_cash
+                    if uncorrelated_config:
+                        allocation_pct = uncorrelated_config['allocation_pct'] / 100.0
+                        uncorrelated_allocation = total_funds * allocation_pct
+                        stocks_allocation = total_funds - uncorrelated_allocation
+                    else:
+                        uncorrelated_allocation = 0.0
+                        stocks_allocation = total_funds
+                
+                
+                # Execute uncorrelated asset purchase
+                if uncorrelated_config and uncorrelated_allocation > 0:
+                    uncorrelated_asset = uncorrelated_config['asset']
                     
                     # Download uncorrelated asset data if not in universe
                     if uncorrelated_asset not in self.data:
@@ -444,7 +470,7 @@ class PortfolioEngine:
                     # Buy uncorrelated asset
                     if uncorrelated_asset in self.data and date in self.data[uncorrelated_asset].index:
                         unc_price = self._get_scalar(self.data[uncorrelated_asset].loc[date, 'Close'])
-                        unc_shares = int(uncorrelated_cash / unc_price)
+                        unc_shares = int(uncorrelated_allocation / unc_price)
                         
                         if unc_shares > 0:
                             unc_cost = unc_shares * unc_price
@@ -493,12 +519,12 @@ class PortfolioEngine:
                 # Rank stocks
                 ranked_stocks = sorted(scores.items(), key=lambda x: x[1], reverse=True)
                 
-                # Select top N stocks within exit rank (investable_cash is now guaranteed scalar)
-                top_stocks = ranked_stocks[:num_stocks] if investable_cash > 0 else []
+                # Select top N stocks
+                top_stocks = ranked_stocks[:num_stocks] if stocks_allocation > 0 else []
                 
-                # Buy top stocks (with remaining cash after uncorrelated allocation)
-                if top_stocks and investable_cash > 0:
-                    position_value = investable_cash / len(top_stocks)
+                # Buy top stocks (with calculated stocks allocation)
+                if top_stocks and stocks_allocation > 0:
+                    position_value = stocks_allocation / len(top_stocks)
                     
                     for ticker, score in top_stocks:
                         buy_price = self._get_scalar(self.data[ticker].loc[date, 'Close'])
