@@ -483,11 +483,16 @@ class PortfolioEngine:
                 available_for_stocks = stocks_target
                 
                 # Calculate scores for all stocks - OPTIMIZED VECTORIZED VERSION
+                # Exclude uncorrelated asset from stock scoring
                 scores = {}
+                uncorrelated_asset_ticker = uncorrelated_config['asset'] if uncorrelated_config else None
                 
-                # Collect all rows for this date
+                # Collect all rows for this date (excluding uncorrelated asset)
                 date_rows = {}
                 for ticker, df in self.data.items():
+                    # Skip uncorrelated asset - it's not a stock
+                    if ticker == uncorrelated_asset_ticker:
+                        continue
                     if date in df.index:
                         date_rows[ticker] = df.loc[date]
                 
