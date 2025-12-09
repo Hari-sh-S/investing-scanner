@@ -689,6 +689,57 @@ with main_tabs[2]:
             st.rerun()
 
     st.markdown("---")
+    
+    # Refresh Universes from NSE
+    st.markdown("### 🔄 Refresh Universe Constituents")
+    st.info("Fetch live index constituents from NSE India. This updates the stock lists for all universes.")
+    
+    refresh_col1, refresh_col2 = st.columns([1, 3])
+    
+    with refresh_col1:
+        if st.button("🔄 Refresh Universes", type="secondary", key="refresh_universes"):
+            try:
+                from nse_fetcher import refresh_universes, load_from_cache
+                
+                progress_bar = st.progress(0)
+                status_text = st.empty()
+                
+                def progress_callback(pct, msg):
+                    progress_bar.progress(pct)
+                    status_text.text(msg)
+                
+                success, message = refresh_universes(progress_callback)
+                
+                progress_bar.progress(1.0)
+                status_text.text("Complete!")
+                
+                if success:
+                    cached, timestamp = load_from_cache()
+                    st.success(f"✅ {message}. Cached at: {timestamp}")
+                    
+                    # Show summary
+                    with st.expander("Universe Summary"):
+                        for name, stocks in sorted(cached.items()):
+                            st.write(f"**{name}**: {len(stocks)} stocks")
+                else:
+                    st.error(f"❌ {message}")
+            except Exception as e:
+                st.error(f"Error refreshing universes: {e}")
+    
+    with refresh_col2:
+        # Show current cache status
+        try:
+            from nse_fetcher import load_from_cache
+            cached, timestamp = load_from_cache()
+            if cached:
+                st.write(f"📅 Last updated: **{timestamp}**")
+                st.write(f"📊 Cached universes: **{len(cached)}**")
+            else:
+                st.write("⚠️ No cached universe data. Click Refresh to download.")
+        except:
+            st.write("⚠️ Universe cache not initialized.")
+    
+    st.markdown("---")
 
     # Download All Data Button
     st.markdown("### 🔽 Download All Universe Data")

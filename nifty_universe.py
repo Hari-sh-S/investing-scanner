@@ -506,13 +506,37 @@ UNIVERSES = {
     "NIFTY MIDCAP LIQUID 15": NIFTY_MIDCAP_50,
 }
 
+def _load_nse_cache():
+    """Load NSE cache if available."""
+    try:
+        from pathlib import Path
+        import json
+        cache_file = Path("nse_universe_cache.json")
+        if cache_file.exists():
+            with open(cache_file, 'r') as f:
+                data = json.load(f)
+                return data.get('universes', {})
+    except:
+        pass
+    return {}
+
 def get_universe(name):
-    """Get stock list for a given universe name."""
+    """Get stock list for a given universe name. Uses NSE cache if available."""
+    # First try NSE cache
+    cached = _load_nse_cache()
+    if name in cached:
+        return cached[name]
+    
+    # Fallback to hardcoded
     return UNIVERSES.get(name, [])
 
 def get_all_universe_names():
-    """Get all available universe names."""
-    return list(UNIVERSES.keys())
+    """Get all available universe names. Combines NSE cache with hardcoded."""
+    # Combine both sources
+    cached = _load_nse_cache()
+    all_names = set(UNIVERSES.keys())
+    all_names.update(cached.keys())
+    return sorted(list(all_names))
 
 def get_broad_market_universes():
     """Get broad market indices."""
