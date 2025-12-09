@@ -473,7 +473,34 @@ with main_tabs[0]:
                             kpi_col3.metric("Total Trades", metrics['Total Trades'])
                             
                             kpi_col4.metric("Avg Trade/Year", f"{metrics['Total Trades'] / max(1, (end_date - start_date).days / 365.25):.1f}")
-                        
+                            kpi_col4.metric("Expectancy", f"₹{metrics.get('Expectancy', 0):,.0f}")
+                            
+                            # Additional Metrics Row
+                            st.markdown("---")
+                            st.markdown("**📊 Advanced Metrics**")
+                            adv_col1, adv_col2, adv_col3, adv_col4 = st.columns(4)
+                            
+                            adv_col1.metric("Max Consecutive Wins", metrics.get('Max Consecutive Wins', 0))
+                            adv_col1.metric("Max Consecutive Losses", metrics.get('Max Consecutive Losses', 0))
+                            
+                            adv_col2.metric("Avg Win", f"₹{metrics.get('Avg Win', 0):,.0f}")
+                            adv_col2.metric("Avg Loss", f"₹{metrics.get('Avg Loss', 0):,.0f}")
+                            
+                            adv_col3.metric("Days to Recover from DD", metrics.get('Days to Recover from DD', 0))
+                            adv_col3.metric("Trades to Recover from DD", metrics.get('Trades to Recover from DD', 0))
+                            
+                            adv_col4.metric("Total Turnover", f"₹{metrics.get('Total Turnover', 0):,.0f}")
+                            adv_col4.metric("Total Charges (Zerodha)", f"₹{metrics.get('Total Charges', 0):,.0f}")
+                            
+                            # Charges Breakdown Expander
+                            with st.expander("📋 Zerodha Charges Breakdown"):
+                                charges_col1, charges_col2 = st.columns(2)
+                                charges_col1.write(f"**STT/CTT (0.1%):** ₹{metrics.get('STT/CTT', 0):,.2f}")
+                                charges_col1.write(f"**Transaction Charges:** ₹{metrics.get('Transaction Charges', 0):,.2f}")
+                                charges_col1.write(f"**SEBI Charges:** ₹{metrics.get('SEBI Charges', 0):,.2f}")
+                                charges_col2.write(f"**Stamp Charges (0.015%):** ₹{metrics.get('Stamp Charges', 0):,.2f}")
+                                charges_col2.write(f"**GST (18%):** ₹{metrics.get('GST', 0):,.2f}")
+                                charges_col2.write(f"**Total Charges:** ₹{metrics.get('Total Charges', 0):,.2f}")
                         with result_tabs[1]:
                             st.markdown("### Performance Charts")
                             

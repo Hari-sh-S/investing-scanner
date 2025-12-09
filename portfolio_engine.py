@@ -658,16 +658,114 @@ class PortfolioEngine:
         rf_rate = 0.05
         sharpe = (cagr / 100 - rf_rate) / (volatility / 100) if volatility > 0 else 0
 
-        # Win Rate
+        # Win Rate and Trade Statistics
+        wins = 0
+        losses = 0
+        win_amounts = []
+        loss_amounts = []
+        consecutive_wins = 0
+        consecutive_losses = 0
+        max_consecutive_wins = 0
+        max_consecutive_losses = 0
+        current_streak = 0
+        last_was_win = None
+        
         if not self.trades_df.empty:
+            # Group trades by ticker to calculate PnL per position
             trades_grouped = self.trades_df.groupby(['Ticker', self.trades_df.index // 2]).apply(
                 lambda x: x.iloc[-1]['Value'] - x.iloc[0]['Value'] if len(x) > 1 else 0
             ).dropna()
-            wins = (trades_grouped > 0).sum()
-            total_trades = len(trades_grouped)
+            
+            for pnl in trades_grouped:
+                if pnl > 0:
+                    wins += 1
+                    win_amounts.append(pnl)
+                    if last_was_win == True:
+                        current_streak += 1
+                    else:
+                        current_streak = 1
+                    max_consecutive_wins = max(max_consecutive_wins, current_streak)
+                    last_was_win = True
+                elif pnl < 0:
+                    losses += 1
+                    loss_amounts.append(abs(pnl))
+                    if last_was_win == False:
+                        current_streak += 1
+                    else:
+                        current_streak = 1
+                    max_consecutive_losses = max(max_consecutive_losses, current_streak)
+                    last_was_win = False
+            
+            total_trades = wins + losses
             win_rate = (wins / total_trades * 100) if total_trades > 0 else 0
         else:
+            total_trades = 0
             win_rate = 0
+        
+        # Expectancy = (Win% * Avg Win) - (Loss% * Avg Loss)
+        avg_win = np.mean(win_amounts) if win_amounts else 0
+        avg_loss = np.mean(loss_amounts) if loss_amounts else 0
+        win_pct = wins / total_trades if total_trades > 0 else 0
+        loss_pct = losses / total_trades if total_trades > 0 else 0
+        expectancy = (win_pct * avg_win) - (loss_pct * avg_loss)
+        
+        # Drawdown Recovery Analysis
+        running_max = self.portfolio_df['Portfolio Value'].cummax()
+        is_in_drawdown = self.portfolio_df['Portfolio Value'] < running_max
+        
+        # Find drawdown periods and recovery
+        recovery_days = 0
+        recovery_trades = 0
+        max_recovery_days = 0
+        max_recovery_trades = 0
+        
+        if is_in_drawdown.any():
+            # Find where drawdown starts and ends
+            drawdown_start = None
+            for i, (date, in_dd) in enumerate(is_in_drawdown.items()):
+                if in_dd and drawdown_start is None:
+                    drawdown_start = date
+                elif not in_dd and drawdown_start is not None:
+                    # Recovered from drawdown
+                    days_in_dd = (date - drawdown_start).days
+                    max_recovery_days = max(max_recovery_days, days_in_dd)
+                    
+                    # Count trades during this period
+                    if not self.trades_df.empty:
+                        trades_in_period = self.trades_df[
+                            (self.trades_df['Date'] >= drawdown_start) & 
+                            (self.trades_df['Date'] <= date)
+                        ]
+                        max_recovery_trades = max(max_recovery_trades, len(trades_in_period) // 2)
+                    
+                    drawdown_start = None
+        
+        # Zerodha Equity Delivery Charges Calculation
+        # STT/CTT: 0.1% on buy & sell
+        # Transaction charges: NSE 0.00297%
+        # GST: 18% on (SEBI + transaction charges)
+        # SEBI: ₹10/crore = 0.0001%
+        # Stamp: 0.015% on buy side only
+        
+        total_turnover = 0
+        total_buy_value = 0
+        total_sell_value = 0
+        
+        if not self.trades_df.empty:
+            buy_trades = self.trades_df[self.trades_df['Type'] == 'BUY']
+            sell_trades = self.trades_df[self.trades_df['Type'] == 'SELL']
+            total_buy_value = buy_trades['Value'].sum() if not buy_trades.empty else 0
+            total_sell_value = sell_trades['Value'].sum() if not sell_trades.empty else 0
+            total_turnover = total_buy_value + total_sell_value
+        
+        # Calculate charges
+        stt_ctt = total_turnover * 0.001  # 0.1% on both sides
+        transaction_charges = total_turnover * 0.0000297  # NSE 0.00297%
+        sebi_charges = total_turnover * 0.000001  # ₹10/crore = 0.0001%
+        stamp_charges = total_buy_value * 0.00015  # 0.015% on buy side
+        gst = (transaction_charges + sebi_charges) * 0.18  # 18% GST
+        
+        total_charges = stt_ctt + transaction_charges + sebi_charges + stamp_charges + gst
 
         return {
             'Final Value': final_value,
@@ -678,7 +776,23 @@ class PortfolioEngine:
             'Volatility %': volatility,
             'Sharpe Ratio': sharpe,
             'Win Rate %': win_rate,
-            'Total Trades': len(self.trades_df) if not self.trades_df.empty else 0
+            'Total Trades': total_trades,
+            # New metrics
+            'Max Consecutive Wins': max_consecutive_wins,
+            'Max Consecutive Losses': max_consecutive_losses,
+            'Days to Recover from DD': max_recovery_days,
+            'Trades to Recover from DD': max_recovery_trades,
+            'Expectancy': expectancy,
+            'Avg Win': avg_win,
+            'Avg Loss': avg_loss,
+            # Zerodha charges
+            'Total Turnover': total_turnover,
+            'STT/CTT': stt_ctt,
+            'Transaction Charges': transaction_charges,
+            'SEBI Charges': sebi_charges,
+            'Stamp Charges': stamp_charges,
+            'GST': gst,
+            'Total Charges': total_charges,
         }
 
     def get_monthly_returns(self):
