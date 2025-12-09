@@ -314,14 +314,19 @@ class PortfolioEngine:
         elif regime_type == 'MACD':
             macd_val = get_scalar(row.get('MACD', 0))
             signal_val = get_scalar(row.get('MACD_Signal', 0))
-            if macd_val < signal_val:
+            triggered = macd_val < signal_val
+            print(f"REGIME CHECK [{date}]: MACD={macd_val:.2f}, Signal={signal_val:.2f}, Triggered={triggered}")
+            if triggered:
                 return True, regime_config['action']
         
         elif regime_type == 'SUPERTREND':
-            st_val = row.get('Supertrend', 'BUY')
-            if hasattr(st_val, 'iloc'):
-                st_val = st_val.iloc[0]
-            if st_val == 'SELL':
+            # Use Supertrend_Direction column which has 'BUY' or 'SELL'
+            st_direction = row.get('Supertrend_Direction', 'BUY')
+            if hasattr(st_direction, 'iloc'):
+                st_direction = st_direction.iloc[0]
+            triggered = st_direction == 'SELL'
+            print(f"REGIME CHECK [{date}]: SuperTrend Direction={st_direction}, Triggered={triggered}")
+            if triggered:
                 return True, regime_config['action']
         
         return False, 'none'

@@ -195,7 +195,8 @@ class IndicatorLibrary:
     @staticmethod
     def add_regime_filters(df):
         """
-        Adds market regime indicators including EMAs for regime filter.
+        Adds market regime indicators including EMAs, MACD, SUPERTREND for regime filter.
+        Supports ALL dropdown options in the UI.
         """
         # Ensure we're working with a DataFrame, not Series
         if isinstance(df, pd.Series):
@@ -208,26 +209,76 @@ class IndicatorLibrary:
         # Get Close as a Series (handle potential DataFrame issues)
         close_series = df['Close']
         if isinstance(close_series, pd.DataFrame):
-            # If somehow Close is a DataFrame, squeeze it to Series
             close_series = close_series.squeeze()
         
-        # 1. EMAs for Regime Filter (ALL periods the UI offers)
+        # 1. EMAs for Regime Filter (ALL periods the UI offers: 34, 68, 100, 150, 200)
         for period in [34, 68, 100, 150, 200]:
             df[f'EMA_{period}'] = ta.trend.ema_indicator(close_series, window=period)
         
-        # 2. Price vs 200 SMA
+        # 2. MACD for Regime Filter (supports all UI presets)
+        # Default MACD (12-26-9), plus custom ones used by regime filter
+        macd_obj = ta.trend.MACD(close_series, window_slow=26, window_fast=12, window_sign=9)
+        df['MACD'] = macd_obj.macd()
+        df['MACD_Signal'] = macd_obj.macd_signal()
+        df['MACD_Diff'] = macd_obj.macd_diff()
+        
+        # 3. SuperTrend for Regime Filter (supports UI presets: 1-1, 1-2, 1-2.5)
+        # Calculate all supertrend variations
+        for period, multiplier in [(1, 1), (1, 2), (1, 2.5), (7, 3)]:
+            suffix = f"_{period}_{str(multiplier).replace('.', '_')}"
+            df = IndicatorLibrary._add_supertrend_basic(df, period, multiplier, suffix)
+        
+        # Default Supertrend without suffix for backward compatibility
+        df['Supertrend'] = df.get(f'Supertrend_7_3', df.get('Supertrend_1_2', 0))
+        df['Supertrend_Direction'] = np.where(close_series > df['Supertrend'], 'BUY', 'SELL')
+        
+        # 4. Price vs 200 SMA
         df['SMA_200'] = ta.trend.sma_indicator(close_series, window=200)
         df['Above_SMA_200'] = (close_series > df['SMA_200']).astype(int)
         
-        # 3. 52-Week High/Low
+        # 5. 52-Week High/Low
         df['52W_High'] = close_series.rolling(window=252).max()
         df['52W_Low'] = close_series.rolling(window=252).min()
         df['Near_52W_High'] = ((close_series / df['52W_High']) > 0.95).astype(int)
         df['Near_52W_Low'] = ((close_series / df['52W_Low']) < 1.05).astype(int)
         
-        # 4. Simple Trend (3M SMA > 6M SMA = Bullish)
+        # 6. Simple Trend (3M SMA > 6M SMA = Bullish)
         df['SMA_63'] = ta.trend.sma_indicator(close_series, window=63)
         df['SMA_126'] = ta.trend.sma_indicator(close_series, window=126)
         df['Bullish_Trend'] = (df['SMA_63'] > df['SMA_126']).astype(int)
         
+        return df
+    
+    @staticmethod
+    def _add_supertrend_basic(df, period, multiplier, suffix=""):
+        """Simplified supertrend calculation for regime filter."""
+        high = df['High'].squeeze() if isinstance(df['High'], pd.DataFrame) else df['High']
+        low = df['Low'].squeeze() if isinstance(df['Low'], pd.DataFrame) else df['Low']
+        close = df['Close'].squeeze() if isinstance(df['Close'], pd.DataFrame) else df['Close']
+        
+        # ATR calculation
+        tr1 = high - low
+        tr2 = abs(high - close.shift(1))
+        tr3 = abs(low - close.shift(1))
+        tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+        atr = tr.ewm(span=period, adjust=False).mean()
+        
+        # Basic bands
+        hl2 = (high + low) / 2
+        upper = hl2 + (multiplier * atr)
+        lower = hl2 - (multiplier * atr)
+        
+        # SuperTrend calculation
+        supertrend = pd.Series(index=df.index, dtype=float)
+        supertrend.iloc[0] = upper.iloc[0]
+        
+        for i in range(1, len(df)):
+            if close.iloc[i] > upper.iloc[i-1]:
+                supertrend.iloc[i] = lower.iloc[i]
+            elif close.iloc[i] < lower.iloc[i-1]:
+                supertrend.iloc[i] = upper.iloc[i]
+            else:
+                supertrend.iloc[i] = supertrend.iloc[i-1]
+        
+        df[f'Supertrend{suffix}'] = supertrend
         return df
