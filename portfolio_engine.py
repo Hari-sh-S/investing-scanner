@@ -669,37 +669,56 @@ class PortfolioEngine:
         max_consecutive_losses = 0
         current_streak = 0
         last_was_win = None
+        total_trades = 0
         
-        if not self.trades_df.empty:
-            # Group trades by ticker to calculate PnL per position
-            trades_grouped = self.trades_df.groupby(['Ticker', self.trades_df.index // 2]).apply(
-                lambda x: x.iloc[-1]['Value'] - x.iloc[0]['Value'] if len(x) > 1 else 0
-            ).dropna()
+        if not self.trades_df.empty and 'Action' in self.trades_df.columns:
+            # Get BUY and SELL trades
+            buy_trades = self.trades_df[self.trades_df['Action'] == 'BUY'].copy()
+            sell_trades = self.trades_df[self.trades_df['Action'] == 'SELL'].copy()
             
-            for pnl in trades_grouped:
-                if pnl > 0:
-                    wins += 1
-                    win_amounts.append(pnl)
-                    if last_was_win == True:
-                        current_streak += 1
-                    else:
-                        current_streak = 1
-                    max_consecutive_wins = max(max_consecutive_wins, current_streak)
-                    last_was_win = True
-                elif pnl < 0:
-                    losses += 1
-                    loss_amounts.append(abs(pnl))
-                    if last_was_win == False:
-                        current_streak += 1
-                    else:
-                        current_streak = 1
-                    max_consecutive_losses = max(max_consecutive_losses, current_streak)
-                    last_was_win = False
+            # For each SELL, find a matching BUY to calculate PnL
+            # Group by Date to get rebalance-level PnL
+            if not sell_trades.empty:
+                for date in sell_trades['Date'].unique():
+                    sells_on_date = sell_trades[sell_trades['Date'] == date]
+                    total_sell = sells_on_date['Value'].sum()
+                    
+                    # Find corresponding previous BUY values (from holdings bought earlier)
+                    # For simplicity, calculate rebalance-level PnL (sell_value - buy_value for same tickers)
+                    for _, sell_row in sells_on_date.iterrows():
+                        ticker = sell_row['Ticker']
+                        sell_value = sell_row['Value']
+                        
+                        # Find previous BUY for this ticker (most recent before this sell)
+                        prev_buys = buy_trades[(buy_trades['Ticker'] == ticker) & (buy_trades['Date'] < date)]
+                        if not prev_buys.empty:
+                            buy_row = prev_buys.iloc[-1]
+                            buy_value = buy_row['Value']
+                            pnl = sell_value - buy_value
+                            
+                            total_trades += 1
+                            
+                            if pnl > 0:
+                                wins += 1
+                                win_amounts.append(pnl)
+                                if last_was_win == True:
+                                    current_streak += 1
+                                else:
+                                    current_streak = 1
+                                max_consecutive_wins = max(max_consecutive_wins, current_streak)
+                                last_was_win = True
+                            elif pnl < 0:
+                                losses += 1
+                                loss_amounts.append(abs(pnl))
+                                if last_was_win == False:
+                                    current_streak += 1
+                                else:
+                                    current_streak = 1
+                                max_consecutive_losses = max(max_consecutive_losses, current_streak)
+                                last_was_win = False
             
-            total_trades = wins + losses
             win_rate = (wins / total_trades * 100) if total_trades > 0 else 0
         else:
-            total_trades = 0
             win_rate = 0
         
         # Expectancy = (Win% * Avg Win) - (Loss% * Avg Loss)
@@ -731,7 +750,7 @@ class PortfolioEngine:
                     max_recovery_days = max(max_recovery_days, days_in_dd)
                     
                     # Count trades during this period
-                    if not self.trades_df.empty:
+                    if not self.trades_df.empty and 'Date' in self.trades_df.columns:
                         trades_in_period = self.trades_df[
                             (self.trades_df['Date'] >= drawdown_start) & 
                             (self.trades_df['Date'] <= date)
@@ -751,9 +770,9 @@ class PortfolioEngine:
         total_buy_value = 0
         total_sell_value = 0
         
-        if not self.trades_df.empty:
-            buy_trades = self.trades_df[self.trades_df['Type'] == 'BUY']
-            sell_trades = self.trades_df[self.trades_df['Type'] == 'SELL']
+        if not self.trades_df.empty and 'Action' in self.trades_df.columns:
+            buy_trades = self.trades_df[self.trades_df['Action'] == 'BUY']
+            sell_trades = self.trades_df[self.trades_df['Action'] == 'SELL']
             total_buy_value = buy_trades['Value'].sum() if not buy_trades.empty else 0
             total_sell_value = sell_trades['Value'].sum() if not sell_trades.empty else 0
             total_turnover = total_buy_value + total_sell_value
