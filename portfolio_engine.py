@@ -453,15 +453,10 @@ class PortfolioEngine:
                             uncorrelated_target = (investable_capital * 0.5) * allocation_pct
                         regime_active = True
                 else:
-                    # No regime active - use all investable capital
+                    # No regime triggered - 100% to stocks, NO uncorrelated
                     regime_active = False
-                    if uncorrelated_config:
-                        allocation_pct = uncorrelated_config['allocation_pct'] / 100.0
-                        uncorrelated_target = investable_capital * allocation_pct
-                        stocks_target = investable_capital - uncorrelated_target
-                    else:
-                        uncorrelated_target = 0.0
-                        stocks_target = investable_capital
+                    uncorrelated_target = 0.0
+                    stocks_target = investable_capital
                 
                 # Execute uncorrelated asset purchase with calculated target
                 if uncorrelated_target > 0 and uncorrelated_config:

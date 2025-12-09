@@ -284,21 +284,25 @@ with main_tabs[0]:
                 'action': regime_action,
                 'index': regime_index
             }
-        
-        st.markdown("**Uncorrelated Asset**")
-        use_uncorrelated = st.checkbox("Invest in Uncorrelated Asset", value=False)
-        
-        uncorrelated_config = None
-        if use_uncorrelated:
-            asset_type = st.text_input("Asset Type", "GOLDBEES",
-                                      help="Enter ticker symbol (e.g., GOLDBEES for Gold)")
-            allocation_pct = st.number_input("Allocation %", 1, 100, 20,
-                                            help="% of portfolio value to allocate")
             
-            uncorrelated_config = {
-                'asset': asset_type,
-                'allocation_pct': allocation_pct
-            }
+            # Uncorrelated Asset - ONLY when regime filter is enabled
+            st.markdown("**Uncorrelated Asset**")
+            use_uncorrelated = st.checkbox("Invest in Uncorrelated Asset", value=False,
+                                          help="Allocate to uncorrelated asset when regime filter triggers")
+            
+            uncorrelated_config = None
+            if use_uncorrelated:
+                asset_type = st.text_input("Asset Type", "GOLDBEES",
+                                          help="Enter ticker symbol (e.g., GOLDBEES for Gold)")
+                allocation_pct = st.number_input("Allocation %", 1, 100, 20,
+                                                help="% of portfolio value to allocate when regime triggers")
+                
+                uncorrelated_config = {
+                    'asset': asset_type,
+                    'allocation_pct': allocation_pct
+                }
+        else:
+            uncorrelated_config = None
     
     with col_scoring:
         st.subheader("Scoring Console")
