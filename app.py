@@ -722,9 +722,23 @@ with main_tabs[2]:
                         for name, stocks in sorted(cached.items()):
                             st.write(f"**{name}**: {len(stocks)} stocks")
                 else:
-                    st.error(f"❌ {message}")
+                    # Show cached data info even if refresh failed
+                    cached, timestamp = load_from_cache()
+                    if cached:
+                        st.warning(f"⚠️ Live refresh failed (NSE blocks cloud servers). Using cached data from: {timestamp} ({len(cached)} universes)")
+                    else:
+                        st.error(f"❌ {message}")
             except Exception as e:
-                st.error(f"Error refreshing universes: {e}")
+                # Check if we have cached data to fall back to
+                try:
+                    from nse_fetcher import load_from_cache
+                    cached, timestamp = load_from_cache()
+                    if cached:
+                        st.warning(f"⚠️ NSE blocks cloud requests. Using pre-loaded cache: {timestamp} ({len(cached)} universes)")
+                    else:
+                        st.error(f"❌ Error refreshing: {e}. Run locally: python nse_fetcher.py")
+                except:
+                    st.error(f"❌ Error: {e}")
     
     with refresh_col2:
         # Show current cache status
