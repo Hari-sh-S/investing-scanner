@@ -266,9 +266,8 @@ class PortfolioEngine:
         return rebalance_dates
 
     def _check_regime_filter(self, date, regime_config, realized_pnl=0):
-        """Check if regime filter is triggered."""
+        """Check if regime filter is triggered on rebalance day."""
         if not regime_config:
-            print(f"DEBUG Regime [{date}]: No regime_config, returning False")
             return False, 'none'  # No filter active
         
         regime_type = regime_config['type']
@@ -280,39 +279,46 @@ class PortfolioEngine:
                 return True, regime_config['action']
             return False, 'none'
         
-        
         # For EMA, MACD, SUPERTREND - need index data
         if self.regime_index_data is None or self.regime_index_data.empty:
-            print(f"DEBUG Regime [{date}]: No regime_index_data, returning False")
             return False, 'none'
         
+        # Use nearest available date if exact date not found (handles holidays)
         if date not in self.regime_index_data.index:
-            print(f"DEBUG Regime [{date}]: Date not in index (index has {len(self.regime_index_data)} rows), returning False")
-            return False, 'none'
+            nearest = self.regime_index_data.index.asof(date)
+            if pd.isna(nearest):
+                return False, 'none'
+            row = self.regime_index_data.loc[nearest]
+        else:
+            row = self.regime_index_data.loc[date]
         
-        row = self.regime_index_data.loc[date]
+        # Helper to extract scalar from potential Series
+        def get_scalar(val):
+            if hasattr(val, 'iloc'):
+                return float(val.iloc[0])
+            return float(val) if val is not None else 0.0
         
         if regime_type == 'EMA':
             ema_period = regime_config['value']
             ema_col = f'EMA_{ema_period}'
-            close_val = row.get('Close', 0)
-            ema_val = row.get(ema_col, 0)
-            # Extract scalar if Series
-            close_price = float(close_val.iloc[0]) if hasattr(close_val, 'iloc') else float(close_val)
-            ema_value = float(ema_val.iloc[0]) if hasattr(ema_val, 'iloc') else float(ema_val)
-            triggered = close_price < ema_value
-            print(f"DEBUG Regime [{date}]: Close={close_price:.2f}, {ema_col}={ema_value:.2f}, Triggered={triggered}")
-            if ema_col in row and triggered:
+            close_price = get_scalar(row.get('Close', 0))
+            ema_value = get_scalar(row.get(ema_col, 0))
+            
+            # Triggered when index closes BELOW EMA
+            if ema_col in row.index and ema_value > 0 and close_price < ema_value:
                 return True, regime_config['action']
         
         elif regime_type == 'MACD':
-            # Check MACD signal
-            if row.get('MACD', 0) < row.get('MACD_Signal', 0):
+            macd_val = get_scalar(row.get('MACD', 0))
+            signal_val = get_scalar(row.get('MACD_Signal', 0))
+            if macd_val < signal_val:
                 return True, regime_config['action']
         
         elif regime_type == 'SUPERTREND':
-            # Check Supertrend
-            if row.get('Supertrend', 'BUY') == 'SELL':
+            st_val = row.get('Supertrend', 'BUY')
+            if hasattr(st_val, 'iloc'):
+                st_val = st_val.iloc[0]
+            if st_val == 'SELL':
                 return True, regime_config['action']
         
         return False, 'none'
@@ -343,6 +349,12 @@ class PortfolioEngine:
                 'NIFTY 100': '^CNX100',
                 'NIFTY 200': '^CNX200',
                 'NIFTY 500': '^CRSLDX',
+                'NIFTY MIDCAP 50': '^NSEMDCP50',
+                'NIFTY MIDCAP 100': '^CNXMC',
+                'NIFTY SMALLCAP 50': '^NIFTYSMCP50',
+                'NIFTY SMALLCAP 100': '^CNXSC',
+                'NIFTY LARGEMIDCAP 250': '^CNXLM250',
+                'NIFTY MIDSMALLCAP 400': '^CNXMSC400',
                 # Sectoral Indices
                 'NIFTY BANK': '^NSEBANK',
                 'NIFTY FINANCIAL SERVICES': '^CNXFINANCE',
@@ -358,7 +370,7 @@ class PortfolioEngine:
                 'NIFTY INFRASTRUCTURE': '^CNXINFRA',
                 # Thematic
                 'NIFTY PSU': '^CNXPSE',
-                'NIFTY MNC': '^CNXMN C'
+                'NIFTY MNC': '^CNXMNC'
             }
             index_ticker = index_map.get(regime_index, '^NSEI')
             
