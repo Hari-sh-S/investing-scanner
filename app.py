@@ -14,33 +14,40 @@ import time
 import json
 from pathlib import Path
 
-# Page config
+# Page config - MUST be first Streamlit command
 st.set_page_config(
     page_title="Investing Scanner",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
 
+# Show loading indicator immediately for wake-up
+with st.spinner("🔄 App is waking up... Please wait..."):
+    pass  # Spinner shows during import time
+
 # Initialize session state for backtest logs
 BACKTEST_LOG_FILE = Path("backtest_logs.json")
 
-def load_backtest_logs():
-    """Load backtest logs from file."""
+@st.cache_data(ttl=3600)  # Cache for 1 hour
+def load_backtest_logs_cached():
+    """Load backtest logs from file with caching."""
     if BACKTEST_LOG_FILE.exists():
         try:
             with open(BACKTEST_LOG_FILE, 'r') as f:
                 logs_data = json.load(f)
-                # Convert back to proper format (engine objects can't be serialized, so we skip them)
                 return logs_data
         except Exception as e:
             print(f"Error loading logs: {e}")
             return []
     return []
 
+def load_backtest_logs():
+    """Load backtest logs from file."""
+    return load_backtest_logs_cached()
+
 def save_backtest_logs(logs):
     """Save backtest logs to file."""
     try:
-        # Serialize logs (skip engine objects)
         serializable_logs = []
         for log in logs:
             serializable_log = {
@@ -48,20 +55,37 @@ def save_backtest_logs(logs):
                 'name': log['name'],
                 'config': log['config'],
                 'metrics': log['metrics']
-                # Note: 'engine' object is not serializable, will be recreated when needed
             }
             serializable_logs.append(serializable_log)
         
         with open(BACKTEST_LOG_FILE, 'w') as f:
             json.dump(serializable_logs, f, indent=2)
+        # Clear cache after saving
+        load_backtest_logs_cached.clear()
     except Exception as e:
         print(f"Error saving logs: {e}")
 
-# Load logs on startup
-if 'backtest_logs' not in st.session_state:
-    st.session_state.backtest_logs = load_backtest_logs()
-if 'backtest_engines' not in st.session_state:
-    st.session_state.backtest_engines = {}  # Store engines separately
+@st.cache_data(ttl=86400)  # Cache universe names for 24 hours
+def get_cached_universe_names():
+    """Cache universe names to speed up app loading."""
+    try:
+        return sorted(get_all_universe_names())
+    except Exception:
+        return ["NIFTY 50", "NIFTY 100", "NIFTY 200"]  # Fallback
+
+# Initialize session state with error handling
+try:
+    if 'backtest_logs' not in st.session_state:
+        st.session_state.backtest_logs = load_backtest_logs()
+    if 'backtest_engines' not in st.session_state:
+        st.session_state.backtest_engines = {}
+    if 'app_ready' not in st.session_state:
+        st.session_state.app_ready = True
+except Exception as e:
+    st.error(f"Error initializing app: {e}. Please refresh the page.")
+    st.session_state.backtest_logs = []
+    st.session_state.backtest_engines = {}
+    st.session_state.app_ready = True
 
 # CSS
 st.markdown("""
