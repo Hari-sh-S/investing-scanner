@@ -792,28 +792,4 @@ with main_tabs[2]:
         st.success(f"✅ Downloaded {success_count}/{len(all_tickers)} stocks in {int(total_time)}s!")
         st.balloons()
 
-    st.markdown("---")
-
-    # Refresh Stock Lists from NSE
-    st.markdown("### 🔄 Refresh Stock Lists from NSE")
-    st.info("Update universe stock lists with latest constituents from NSE India.")
-
-    if st.button("🔄 Refresh from NSE", type="secondary"):
-        with st.spinner("Fetching live data from NSE India..."):
-            try:
-                from nse_fetcher import update_universe_file_inplace
-
-                results = update_universe_file_inplace("nifty_universe.py")
-
-                st.success(f"✅ Updated {len(results)} indices from NSE!")
-
-                # Show summary
-                for idx_name, stocks in results.items():
-                    st.caption(f"✓ {idx_name}: {len(stocks)} stocks")
-
-                st.warning("⚠️ Restart the app to use updated stock lists")
-                st.balloons()
-
-            except Exception as e:
-                st.error(f"❌ Error: {e}")
 
