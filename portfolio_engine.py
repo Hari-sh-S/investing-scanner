@@ -415,12 +415,19 @@ class PortfolioEngine:
             index_ticker = index_map.get(regime_index, '^NSEI')
             
             try:
-                regime_data = yf.download(index_ticker, start=self.start_date, end=self.end_date, progress=False)
+                # Download EXTRA historical data (300 days before start_date) 
+                # so EMA 200 can be properly calculated from day 1 of backtest
+                extended_start = pd.Timestamp(self.start_date) - timedelta(days=400)  # ~300 trading days
+                regime_data = yf.download(index_ticker, start=extended_start, end=self.end_date, progress=False)
                 if not regime_data.empty:
+                    print(f"Downloaded {len(regime_data)} days of regime index data (with 400-day pre-buffer for EMA)")
                     regime_data = IndicatorLibrary.add_regime_filters(regime_data)
                     self.regime_index_data = regime_data
-            except:
-                print("Could not load regime index data")
+                    # Debug: show first few EMA values
+                    if 'EMA_200' in regime_data.columns:
+                        print(f"EMA_200 range: {regime_data['EMA_200'].min():.2f} - {regime_data['EMA_200'].max():.2f}")
+            except Exception as e:
+                print(f"Could not load regime index data: {e}")
         
         # Get common date range
         all_dates = sorted(list(set().union(*[df.index for df in self.data.values()])))
