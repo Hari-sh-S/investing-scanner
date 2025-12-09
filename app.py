@@ -622,9 +622,16 @@ with main_tabs[2]:
     cache_info = cache.get_cache_info()
 
     # Show cache status
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns([1, 1, 1])
     col1.metric("Cached Stocks", cache_info['total_files'])
     col2.metric("Storage Used", f"{cache_info['total_size_mb']:.2f} MB")
+    
+    with col3:
+        st.write("")  # Spacer
+        if st.button("🗑️ Clear All Cache", type="secondary", key="clear_cache"):
+            cache.clear()
+            st.success("✅ Cache cleared! Please refresh the page.")
+            st.rerun()
 
     st.markdown("---")
 
