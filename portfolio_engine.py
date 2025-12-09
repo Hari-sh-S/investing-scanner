@@ -235,8 +235,9 @@ class PortfolioEngine:
         return len(self.data) > 0
 
     def _get_rebalance_dates(self, all_dates, rebal_config):
-        """Generate rebalance dates based on config."""
+        """Generate rebalance dates based on config. Ensures every period has a rebalance."""
         freq = rebal_config['frequency']
+        all_dates_set = set(all_dates)
         
         if freq == 'Weekly':
             # Get day of week (0=Monday, 4=Friday)
@@ -246,24 +247,55 @@ class PortfolioEngine:
             rebalance_dates = [d for d in all_dates if d.weekday() == target_day]
         else:  # Monthly
             target_date = rebal_config['date']
-            alt_option = rebal_config['alt_day']
+            alt_option = rebal_config.get('alt_day', 'Next Day')
             
             rebalance_dates = []
+            
+            # Group dates by (year, month)
+            month_groups = {}
             for date in all_dates:
-                if date.day == target_date:
-                    rebalance_dates.append(date)
-                elif alt_option == 'Previous Day' and date.day == target_date - 1:
-                    # Check if target_date doesn't exist in this month
-                    next_day = date + timedelta(days=1)
-                    if next_day.month != date.month or next_day not in all_dates:
-                        rebalance_dates.append(date)
-                elif alt_option == 'Next Day' and date.day == target_date + 1:
-                    # Check if target_date doesn't exist
-                    prev_day = date - timedelta(days=1)
-                    if prev_day.day != target_date or prev_day not in all_dates:
-                        rebalance_dates.append(date)
+                key = (date.year, date.month)
+                if key not in month_groups:
+                    month_groups[key] = []
+                month_groups[key].append(date)
+            
+            # For each month, find the best rebalance date
+            for (year, month), month_dates in month_groups.items():
+                month_dates_sorted = sorted(month_dates)
+                rebalance_date = None
+                
+                # First, try to find exact target date
+                for d in month_dates_sorted:
+                    if d.day == target_date:
+                        rebalance_date = d
+                        break
+                
+                # If not found, use alternative
+                if rebalance_date is None:
+                    if alt_option == 'Previous Day':
+                        # Find the closest trading day BEFORE target date
+                        for d in reversed(month_dates_sorted):
+                            if d.day < target_date:
+                                rebalance_date = d
+                                break
+                        # If no day before, take the first available day
+                        if rebalance_date is None and month_dates_sorted:
+                            rebalance_date = month_dates_sorted[0]
+                    else:  # Next Day
+                        # Find the closest trading day AFTER target date
+                        for d in month_dates_sorted:
+                            if d.day > target_date:
+                                rebalance_date = d
+                                break
+                        # If no day after, take the last available day
+                        if rebalance_date is None and month_dates_sorted:
+                            rebalance_date = month_dates_sorted[-1]
+                
+                if rebalance_date:
+                    rebalance_dates.append(rebalance_date)
         
-        return rebalance_dates
+        print(f"Generated {len(rebalance_dates)} rebalance dates from {len(all_dates)} trading days")
+        return sorted(rebalance_dates)
 
     def _check_regime_filter(self, date, regime_config, realized_pnl=0):
         """Check if regime filter is triggered on rebalance day."""
