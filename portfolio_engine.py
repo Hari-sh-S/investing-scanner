@@ -304,8 +304,11 @@ class PortfolioEngine:
             close_price = get_scalar(row.get('Close', 0))
             ema_value = get_scalar(row.get(ema_col, 0))
             
+            triggered = ema_col in row.index and ema_value > 0 and close_price < ema_value
+            print(f"REGIME CHECK [{date}]: Close={close_price:.2f}, {ema_col}={ema_value:.2f}, Triggered={triggered}")
+            
             # Triggered when index closes BELOW EMA
-            if ema_col in row.index and ema_value > 0 and close_price < ema_value:
+            if triggered:
                 return True, regime_config['action']
         
         elif regime_type == 'MACD':
