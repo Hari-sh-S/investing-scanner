@@ -195,7 +195,7 @@ class IndicatorLibrary:
     @staticmethod
     def add_regime_filters(df):
         """
-        Adds market regime indicators.
+        Adds market regime indicators including EMAs for regime filter.
         """
         # Ensure we're working with a DataFrame, not Series
         if isinstance(df, pd.Series):
@@ -211,17 +211,21 @@ class IndicatorLibrary:
             # If somehow Close is a DataFrame, squeeze it to Series
             close_series = close_series.squeeze()
         
-        # 1. Price vs 200 SMA
+        # 1. EMAs for Regime Filter (ALL periods the UI offers)
+        for period in [34, 68, 100, 150, 200]:
+            df[f'EMA_{period}'] = ta.trend.ema_indicator(close_series, window=period)
+        
+        # 2. Price vs 200 SMA
         df['SMA_200'] = ta.trend.sma_indicator(close_series, window=200)
         df['Above_SMA_200'] = (close_series > df['SMA_200']).astype(int)
         
-        # 2. 52-Week High/Low
+        # 3. 52-Week High/Low
         df['52W_High'] = close_series.rolling(window=252).max()
         df['52W_Low'] = close_series.rolling(window=252).min()
         df['Near_52W_High'] = ((close_series / df['52W_High']) > 0.95).astype(int)
         df['Near_52W_Low'] = ((close_series / df['52W_Low']) < 1.05).astype(int)
         
-        # 3. Simple Trend (3M SMA > 6M SMA = Bullish)
+        # 4. Simple Trend (3M SMA > 6M SMA = Bullish)
         df['SMA_63'] = ta.trend.sma_indicator(close_series, window=63)
         df['SMA_126'] = ta.trend.sma_indicator(close_series, window=126)
         df['Bullish_Trend'] = (df['SMA_63'] > df['SMA_126']).astype(int)
