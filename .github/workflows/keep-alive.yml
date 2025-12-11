@@ -1,0 +1,19 @@
+name: Keep Streamlit App Alive
+
+on:
+  schedule:
+    # Runs every 30 minutes
+    - cron: '*/30 * * * *'
+  workflow_dispatch:  # Allows manual trigger from GitHub Actions UI
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Streamlit App
+        run: |
+          echo "Pinging Streamlit app to keep it alive..."
+          # Replace with your actual Streamlit app URL
+          curl -s -o /dev/null -w "%{http_code}" https://investing-scanner.streamlit.app || true
+          echo ""
+          echo "Ping completed at $(date)"
