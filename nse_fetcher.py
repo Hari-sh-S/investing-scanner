@@ -25,22 +25,28 @@ def get_nse_client():
 
 
 def fetch_all_indices(progress_callback=None):
-    """Fetch constituents for all available indices."""
+    """Fetch constituents only for our specified 55 indexes."""
     nse = get_nse_client()
     if not nse:
         print("NSE client not available")
         return {}
     
-    # Get all available indices
-    all_indices = nse.get_index_list()
-    print(f"Found {len(all_indices)} indices on NSE")
+    # Only fetch our specified indexes
+    try:
+        from nifty_universe import INDEX_NAMES
+        target_indices = INDEX_NAMES
+    except:
+        # Fallback to all NSE indices
+        target_indices = nse.get_index_list()
+    
+    print(f"Fetching {len(target_indices)} indexes...")
     
     results = {}
-    total = len(all_indices)
+    total = len(target_indices)
     success_count = 0
     fail_count = 0
     
-    for i, index_name in enumerate(all_indices):
+    for i, index_name in enumerate(target_indices):
         if progress_callback:
             progress_callback(i / total, f"Fetching {index_name}...")
         
