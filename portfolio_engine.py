@@ -189,27 +189,29 @@ class PortfolioEngine:
             if self.cache:
                 cached_data = self.cache.get(ticker)
                 if cached_data is not None:
-                    # Fix index - Date should be the index
-                    if 'Date' in cached_data.columns:
-                        cached_data['Date'] = pd.to_datetime(cached_data['Date'])
-                        cached_data = cached_data.drop_duplicates(subset=['Date'], keep='last')
-                        cached_data.set_index('Date', inplace=True)
+                    try:
+                        # Fix index - Date should be the index
+                        if 'Date' in cached_data.columns:
+                            cached_data['Date'] = pd.to_datetime(cached_data['Date'])
+                            cached_data.set_index('Date', inplace=True)
 
-                    # Ensure index is datetime
-                    if not isinstance(cached_data.index, pd.DatetimeIndex):
-                        cached_data.index = pd.to_datetime(cached_data.index)
+                        # Ensure index is datetime
+                        if not isinstance(cached_data.index, pd.DatetimeIndex):
+                            cached_data.index = pd.to_datetime(cached_data.index)
 
-                    # Clean data - remove duplicates
-                    cached_data = clean_dataframe(cached_data)
+                        # Clean data - remove duplicate indices
+                        cached_data = clean_dataframe(cached_data)
 
-                    # Filter to date range
-                    mask = (cached_data.index >= pd.Timestamp(self.start_date)) & \
-                           (cached_data.index <= pd.Timestamp(self.end_date))
-                    df_filtered = cached_data[mask].copy()
+                        # Filter to date range
+                        mask = (cached_data.index >= pd.Timestamp(self.start_date)) & \
+                               (cached_data.index <= pd.Timestamp(self.end_date))
+                        df_filtered = cached_data[mask].copy()
 
-                    if not df_filtered.empty and len(df_filtered) >= 100:
-                        self.data[ticker] = df_filtered
-                        continue
+                        if not df_filtered.empty and len(df_filtered) >= 100:
+                            self.data[ticker] = df_filtered
+                            continue
+                    except Exception as e:
+                        print(f"Error loading {ticker}: {e}")
 
             # If not in cache or insufficient data, mark for download
             tickers_to_download.append(ticker)
@@ -224,25 +226,27 @@ class PortfolioEngine:
                 if self.cache:
                     cached_data = self.cache.get(ticker)
                     if cached_data is not None:
-                        # Fix index - Date should be the index
-                        if 'Date' in cached_data.columns:
-                            cached_data['Date'] = pd.to_datetime(cached_data['Date'])
-                            cached_data = cached_data.drop_duplicates(subset=['Date'], keep='last')
-                            cached_data.set_index('Date', inplace=True)
+                        try:
+                            # Fix index - Date should be the index
+                            if 'Date' in cached_data.columns:
+                                cached_data['Date'] = pd.to_datetime(cached_data['Date'])
+                                cached_data.set_index('Date', inplace=True)
 
-                        # Ensure index is datetime
-                        if not isinstance(cached_data.index, pd.DatetimeIndex):
-                            cached_data.index = pd.to_datetime(cached_data.index)
+                            # Ensure index is datetime
+                            if not isinstance(cached_data.index, pd.DatetimeIndex):
+                                cached_data.index = pd.to_datetime(cached_data.index)
 
-                        # Clean data
-                        cached_data = clean_dataframe(cached_data)
+                            # Clean data
+                            cached_data = clean_dataframe(cached_data)
 
-                        mask = (cached_data.index >= pd.Timestamp(self.start_date)) & \
-                               (cached_data.index <= pd.Timestamp(self.end_date))
-                        df_filtered = cached_data[mask].copy()
+                            mask = (cached_data.index >= pd.Timestamp(self.start_date)) & \
+                                   (cached_data.index <= pd.Timestamp(self.end_date))
+                            df_filtered = cached_data[mask].copy()
 
-                        if not df_filtered.empty:
-                            self.data[ticker] = df_filtered
+                            if not df_filtered.empty:
+                                self.data[ticker] = df_filtered
+                        except Exception as e:
+                            print(f"Error loading {ticker} after download: {e}")
 
         print(f"Successfully loaded {len(self.data)} stocks")
         return len(self.data) > 0
