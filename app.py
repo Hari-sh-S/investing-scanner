@@ -774,15 +774,14 @@ with main_tabs[2]:
     with refresh_col2:
         # Show current cache status
         try:
+            from nifty_universe import INDEX_NAMES
             from nse_fetcher import load_from_cache
             cached, timestamp = load_from_cache()
-            if cached:
-                st.write(f"📅 Last updated: **{timestamp}**")
-                st.write(f"📊 Cached universes: **{len(cached)}**")
-            else:
-                st.write("⚠️ No cached universe data. Click Refresh to download.")
+            st.write(f"📊 Active indexes: **{len(INDEX_NAMES)}**")
+            if cached and timestamp:
+                st.write(f"📅 Cache updated: **{timestamp}**")
         except:
-            st.write("⚠️ Universe cache not initialized.")
+            st.write("⚠️ Universe data not initialized.")
     
     st.markdown("---")
 
