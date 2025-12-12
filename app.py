@@ -748,10 +748,14 @@ with main_tabs[2]:
                     cached, timestamp = load_from_cache()
                     st.success(f"✅ {message}. Cached at: {timestamp}")
                     
-                    # Show summary
+                    # Show summary - only for our specified indexes
+                    from nifty_universe import INDEX_NAMES
                     with st.expander("Universe Summary"):
-                        for name, stocks in sorted(cached.items()):
-                            st.write(f"**{name}**: {len(stocks)} stocks")
+                        for name in INDEX_NAMES:
+                            if name in cached:
+                                st.write(f"**{name}**: {len(cached[name])} stocks")
+                            else:
+                                st.write(f"**{name}**: Not in cache")
                 else:
                     # Show cached data info even if refresh failed
                     cached, timestamp = load_from_cache()
