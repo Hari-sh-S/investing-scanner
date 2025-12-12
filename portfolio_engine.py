@@ -190,18 +190,18 @@ class PortfolioEngine:
         tickers_to_download = []
 
         def clean_dataframe(df):
-            """Remove duplicates and ensure clean data."""
-            if df is None or df.empty:
+            """Remove duplicates and ensure clean data. Returns None if cleaning fails."""
+            try:
+                if df is None or df.empty:
+                    return df
+                # Remove duplicate indices (dates)
+                if hasattr(df.index, 'duplicated') and df.index.duplicated().any():
+                    df = df[~df.index.duplicated(keep='last')]
+                # Sort by date
+                df = df.sort_index()
                 return df
-            # Remove duplicate indices (dates)
-            if df.index.duplicated().any():
-                df = df[~df.index.duplicated(keep='last')]
-            # Sort by date
-            df = df.sort_index()
-            # Remove NaN close prices
-            if 'Close' in df.columns:
-                df = df.dropna(subset=['Close'])
-            return df
+            except Exception:
+                return df  # Return unchanged if cleaning fails
 
         # First, try to load from cache
         for i, ticker in enumerate(self.universe):
