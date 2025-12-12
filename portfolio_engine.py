@@ -87,9 +87,8 @@ class PortfolioEngine:
         return value
 
     def download_and_cache_universe(self, universe_tickers, progress_callback=None, stop_flag=None):
-        """Parallel download for faster data fetching. Uses ThreadPoolExecutor for 5-10x speedup."""
+        """Sequential download with indicators calculated immediately."""
         import time
-        from concurrent.futures import ThreadPoolExecutor, as_completed
 
         # Filter already cached
         tickers_to_download = []
@@ -102,29 +101,27 @@ class PortfolioEngine:
             return len(universe_tickers)
 
         success_count = 0
-        failed_count = 0
         start_time = time.time()
-        completed = 0
-        
-        def download_single(ticker):
-            """Download and cache a single ticker with indicators."""
+        last_update = start_time
+
+        # Sequential download (more reliable on Streamlit Cloud)
+        for i, ticker in enumerate(tickers_to_download):
+            # Check stop flag
+            if stop_flag and stop_flag[0]:
+                print(f"Stopped at {i}/{len(tickers_to_download)}")
+                break
+
             try:
                 ticker_ns = ticker if ticker.endswith(('.NS', '.BO')) else f"{ticker}.NS"
                 df = yf.download(ticker_ns, period="max", interval="1d", progress=False, auto_adjust=True)
 
                 if not df.empty and len(df) >= 100:
+                    # Reset index to make Date a column
                     df.reset_index(inplace=True)
+
+                    # Keep only OHLCV columns
                     expected_cols = ['Date', 'Open', 'High', 'Low', 'Close', 'Volume']
                     df = df[[col for col in expected_cols if col in df.columns]]
-                    
-                    # CRITICAL: Remove duplicates and sort by date
-                    if 'Date' in df.columns:
-                        df['Date'] = pd.to_datetime(df['Date'])
-                        df = df.drop_duplicates(subset=['Date'], keep='last')
-                        df = df.sort_values('Date').reset_index(drop=True)
-                    
-                    # Remove any rows with NaN in critical columns
-                    df = df.dropna(subset=['Close'])
                     
                     # Calculate indicators
                     try:
@@ -132,46 +129,28 @@ class PortfolioEngine:
                         df_with_date_index = IndicatorLibrary.add_momentum_volatility_metrics(df_with_date_index)
                         df_with_date_index = IndicatorLibrary.add_regime_filters(df_with_date_index)
                         df = df_with_date_index.reset_index()
-                    except:
-                        pass  # Use raw data if indicators fail
+                    except Exception as e:
+                        print(f"Indicator calculation failed for {ticker}: {e}")
 
                     if self.cache:
                         self.cache.set(ticker, df)
-                    return ticker, True
-                return ticker, False
-            except Exception as e:
-                return ticker, False
+                        success_count += 1
 
-        # Use parallel downloads with ThreadPoolExecutor (5 workers for rate limiting)
-        max_workers = 5  # Balance between speed and rate limiting
-        
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            # Submit all downloads
-            future_to_ticker = {executor.submit(download_single, t): t for t in tickers_to_download}
-            
-            for future in as_completed(future_to_ticker):
-                # Check stop flag
-                if stop_flag and stop_flag[0]:
-                    executor.shutdown(wait=False, cancel_futures=True)
-                    break
-                
-                ticker, success = future.result()
-                completed += 1
-                
-                if success:
-                    success_count += 1
-                else:
-                    failed_count += 1
-                
-                # Update progress
-                if progress_callback:
-                    elapsed = time.time() - start_time
-                    avg = elapsed / completed if completed > 0 else 0
-                    remaining_time = avg * (len(tickers_to_download) - completed)
+                # Update progress every 3 seconds
+                current_time = time.time()
+                if progress_callback and (current_time - last_update >= 3.0 or i == len(tickers_to_download) - 1):
+                    elapsed = current_time - start_time
+                    avg = elapsed / (i + 1) if (i + 1) > 0 else 0
+                    remaining_time = avg * (len(tickers_to_download) - (i + 1))
                     try:
-                        progress_callback(completed, len(tickers_to_download), ticker, remaining_time)
+                        progress_callback(i + 1, len(tickers_to_download), ticker, remaining_time)
                     except TypeError:
-                        progress_callback(completed, len(tickers_to_download), ticker)
+                        progress_callback(i + 1, len(tickers_to_download), ticker)
+                    last_update = current_time
+
+            except Exception as e:
+                print(f"Download error for {ticker}: {e}")
+                continue
 
         # Final update
         if progress_callback:
@@ -180,8 +159,7 @@ class PortfolioEngine:
             except TypeError:
                 progress_callback(len(tickers_to_download), len(tickers_to_download), "Done")
 
-        elapsed = time.time() - start_time
-        print(f"Downloaded {success_count}/{len(tickers_to_download)} stocks in {elapsed:.1f}s ({elapsed/max(completed,1):.2f}s/stock)")
+        print(f"Downloaded {success_count}/{len(tickers_to_download)} stocks in {time.time() - start_time:.1f}s")
         return len(universe_tickers)
 
     def fetch_data(self, progress_callback=None):
