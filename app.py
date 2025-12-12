@@ -575,9 +575,68 @@ with main_tabs[0]:
                         with result_tabs[4]:
                             st.markdown("### Trade History")
                             if not engine.trades_df.empty:
-                                trade_display = engine.trades_df.copy()
-                                trade_display['Date'] = pd.to_datetime(trade_display['Date']).dt.strftime('%Y-%m-%d')
-                                st.dataframe(trade_display, use_container_width=True, height=400)
+                                # Create consolidated trade view matching BUY with SELL
+                                trades_df = engine.trades_df.copy()
+                                buy_trades = trades_df[trades_df['Action'] == 'BUY'].copy()
+                                sell_trades = trades_df[trades_df['Action'] == 'SELL'].copy()
+                                
+                                consolidated_trades = []
+                                
+                                for _, sell in sell_trades.iterrows():
+                                    ticker = sell['Ticker']
+                                    sell_date = sell['Date']
+                                    
+                                    # Find the most recent BUY for this ticker before this SELL
+                                    prev_buys = buy_trades[
+                                        (buy_trades['Ticker'] == ticker) & 
+                                        (buy_trades['Date'] < sell_date)
+                                    ]
+                                    
+                                    if not prev_buys.empty:
+                                        buy = prev_buys.iloc[-1]
+                                        buy_price = float(buy['Price'])
+                                        sell_price = float(sell['Price'])
+                                        shares = int(buy['Shares'])
+                                        roi = ((sell_price - buy_price) / buy_price) * 100
+                                        
+                                        consolidated_trades.append({
+                                            'Stock': ticker.replace('.NS', ''),
+                                            'Buy Date': pd.to_datetime(buy['Date']).strftime('%Y-%m-%d'),
+                                            'Buy Price': round(buy_price, 2),
+                                            'Exit Date': pd.to_datetime(sell_date).strftime('%Y-%m-%d'),
+                                            'Exit Price': round(sell_price, 2),
+                                            'Shares': shares,
+                                            'ROI %': round(roi, 2)
+                                        })
+                                
+                                if consolidated_trades:
+                                    trade_display = pd.DataFrame(consolidated_trades)
+                                    
+                                    # Color ROI column
+                                    def color_roi(val):
+                                        if val > 0:
+                                            return 'color: #28a745; font-weight: bold'
+                                        elif val < 0:
+                                            return 'color: #dc3545; font-weight: bold'
+                                        return ''
+                                    
+                                    styled_trades = trade_display.style.applymap(
+                                        color_roi, subset=['ROI %']
+                                    )
+                                    st.dataframe(styled_trades, use_container_width=True, height=400)
+                                    
+                                    # Summary stats
+                                    st.markdown("---")
+                                    stat_col1, stat_col2, stat_col3, stat_col4 = st.columns(4)
+                                    stat_col1.metric("Total Trades", len(consolidated_trades))
+                                    profitable = len([t for t in consolidated_trades if t['ROI %'] > 0])
+                                    stat_col2.metric("Profitable", f"{profitable} ({profitable/len(consolidated_trades)*100:.1f}%)")
+                                    avg_roi = sum(t['ROI %'] for t in consolidated_trades) / len(consolidated_trades)
+                                    stat_col3.metric("Avg ROI", f"{avg_roi:.2f}%")
+                                    best_trade = max(consolidated_trades, key=lambda x: x['ROI %'])
+                                    stat_col4.metric("Best Trade", f"{best_trade['Stock']} ({best_trade['ROI %']:.1f}%)")
+                                else:
+                                    st.info("No completed trades to display")
                             else:
                                 st.info("No trades executed")
                     else:
