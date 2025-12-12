@@ -8,6 +8,7 @@ from scoring import ScoreParser
 from nifty_universe import (get_all_universe_names, get_universe, 
                             get_broad_market_universes, get_sectoral_universes,
                             get_cap_based_universes, get_thematic_universes)
+from report_generator import create_excel_with_charts, create_pdf_report, prepare_complete_log_data
 import datetime
 import io
 import time
@@ -46,7 +47,7 @@ def load_backtest_logs():
     return load_backtest_logs_cached()
 
 def save_backtest_logs(logs):
-    """Save backtest logs to file."""
+    """Save backtest logs to file with complete data (no truncation)."""
     try:
         serializable_logs = []
         for log in logs:
@@ -54,12 +55,16 @@ def save_backtest_logs(logs):
                 'timestamp': log['timestamp'],
                 'name': log['name'],
                 'config': log['config'],
-                'metrics': log['metrics']
+                'metrics': log['metrics'],
+                # Store complete data without truncation
+                'portfolio_values': log.get('portfolio_values', []),
+                'trades': log.get('trades', []),
+                'monthly_returns': log.get('monthly_returns', {})
             }
             serializable_logs.append(serializable_log)
         
         with open(BACKTEST_LOG_FILE, 'w') as f:
-            json.dump(serializable_logs, f, indent=2)
+            json.dump(serializable_logs, f, indent=2, default=str)
         # Clear cache after saving
         load_backtest_logs_cached.clear()
     except Exception as e:
@@ -134,75 +139,6 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Helper function to create Excel download
-def create_excel_download(config, metrics, engine=None):
-    output = io.BytesIO()
-    with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        # Inputs Sheet
-        inputs_data = {
-            'Parameter': ['Strategy Name', 'Starting Capital', 'Universe',
-                        'No Of Stocks in Portfolio', 'Exit Rank',
-                        'Rebalance Frequency', 'Start Date', 'End Date',
-                        'Regime Filter', 'Strategy'],
-            'Value': [
-                config.get('name', 'Backtest'),
-                config['initial_capital'],
-                config['universe_name'],
-                config['num_stocks'],
-                config.get('exit_rank', config['num_stocks']),
-                config['rebalance_freq'],
-                config['start_date'],
-                config['end_date'],
-                str(config.get('regime_config', {})),
-                config['formula']
-            ]
-        }
-        pd.DataFrame(inputs_data).to_excel(writer, sheet_name='Inputs', index=False)
-
-        # Performance Metrics Sheet
-        perf_data = {
-            'Metric': ['Start Date', 'End Date', 'Invested Capital', 'Current Capital',
-                     'Win Rate(%)', 'Max. DD(%)', 'CAGR(%)',
-                     'Sharpe Ratio', 'Total Trades'],
-            'Score': [
-                config['start_date'],
-                config['end_date'],
-                config['initial_capital'],
-                metrics['Final Value'],
-                metrics['Win Rate %'],
-                metrics['Max Drawdown %'],
-                metrics['CAGR %'],
-                metrics['Sharpe Ratio'],
-                metrics['Total Trades']
-            ]
-        }
-        pd.DataFrame(perf_data).to_excel(writer, sheet_name='Performance Metrics', index=False)
-
-        # Monthly Returns Table
-        if engine and hasattr(engine, 'portfolio_df'):
-            if not engine.portfolio_df.empty:
-                monthly_returns = engine.get_monthly_returns()
-                if not monthly_returns.empty:
-                    monthly_returns.to_excel(writer, sheet_name='Monthly Returns')
-
-        # Daily Portfolio Report and Trade History - only if engine is available
-        if engine and hasattr(engine, 'portfolio_df'):
-            if not engine.portfolio_df.empty:
-                daily_data = engine.portfolio_df.copy()
-                daily_data['Year'] = daily_data.index.year
-                daily_data['Month'] = daily_data.index.month
-                daily_data['Day'] = daily_data.index.day
-                daily_data[['Year', 'Month', 'Day', 'Portfolio Value', 'Cash', 'Positions']].to_excel(
-                    writer, sheet_name='Daily Report', index=False
-                )
-
-            # Trade History
-            if hasattr(engine, 'trades_df') and not engine.trades_df.empty:
-                engine.trades_df.to_excel(writer, sheet_name='Trade History', index=False)
-
-    output.seek(0)
-    return output
-
 # Header
 col_title, col_actions = st.columns([3, 1])
 with col_title:
@@ -260,12 +196,13 @@ with main_tabs[0]:
             rebal_day = st.selectbox("Rebalance Day", ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"])
             rebalance_date = None
         else:  # Monthly
-            rebalance_date = st.number_input("Rebalance Date (1-30)", 1, 30, 15,
+            rebalance_date = st.number_input("Rebalance Date (1-30)", 1, 30, 1,
                                             help="Day of month to rebalance portfolio")
             rebal_day = None
         
         alt_day_option = st.selectbox("Alternative Rebalance Day", 
                                      ["Previous Day", "Next Day"],
+                                     index=1,
                                      help="If rebalance day is holiday, use this option")
         
         st.markdown("**Regime Filter**")
@@ -439,11 +376,9 @@ with main_tabs[0]:
                         metrics = engine.get_metrics()
                     
                     if metrics:
-                        # Save to logs
-                        backtest_log = {
-                            'timestamp': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                            'name': f"Backtest_{datetime.datetime.now().strftime('%m%d_%H%M')}",
-                            'config': {
+                        # Prepare complete log data (no truncation)
+                        complete_log_data = prepare_complete_log_data(
+                            {
                                 'name': f"Backtest_{datetime.datetime.now().strftime('%m%d_%H%M')}",
                                 'initial_capital': initial_capital,
                                 'universe_name': selected_universe,
@@ -456,24 +391,44 @@ with main_tabs[0]:
                                 'uncorrelated_config': uncorrelated_config if uncorrelated_config else {},
                                 'formula': formula
                             },
+                            metrics,
+                            engine
+                        )
+                        
+                        # Save to logs with complete data
+                        backtest_log = {
+                            'timestamp': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                            'name': f"Backtest_{datetime.datetime.now().strftime('%m%d_%H%M')}",
+                            'config': complete_log_data['config'],
                             'metrics': metrics,
+                            'portfolio_values': complete_log_data['portfolio_values'],
+                            'trades': complete_log_data['trades'],
+                            'monthly_returns': complete_log_data['monthly_returns']
                         }
                         st.session_state.backtest_logs.append(backtest_log)
                         save_backtest_logs(st.session_state.backtest_logs)  # Save to file
                         
                         st.markdown("---")
                         
-                        # Action buttons
-                        col_h, col_download = st.columns([4, 1])
+                        # Action buttons - Excel and PDF downloads
+                        col_h, col_excel, col_pdf = st.columns([3, 1, 1])
                         with col_h:
                             st.subheader("Backtest Results")
-                        with col_download:
-                            excel_data = create_excel_download(backtest_log['config'], metrics, engine)
+                        with col_excel:
+                            excel_data = create_excel_with_charts(backtest_log['config'], metrics, engine)
                             st.download_button(
                                 label="📥 Excel",
                                 data=excel_data,
                                 file_name=f"backtest_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
                                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                            )
+                        with col_pdf:
+                            pdf_data = create_pdf_report(backtest_log['config'], metrics, engine)
+                            st.download_button(
+                                label="📄 PDF",
+                                data=pdf_data,
+                                file_name=f"backtest_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
+                                mime="application/pdf"
                             )
                         
                         # Result tabs
@@ -650,15 +605,32 @@ with main_tabs[1]:
                 metrics = log['metrics']
                 st.markdown(f"**Final Value:** ₹{metrics['Final Value']:,.0f} | **CAGR:** {metrics['CAGR %']:.2f}% | **Sharpe:** {metrics['Sharpe Ratio']:.2f} | **Win Rate:** {metrics['Win Rate %']:.1f}%")
                 
-                # Download button
-                excel_data = create_excel_download(log['config'], metrics)
-                st.download_button(
-                    label="📥 Download Excel",
-                    data=excel_data,
-                    file_name=f"{log['name']}.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    key=f"download_{idx}"
-                )
+                # Show additional log info if available
+                if log.get('trades'):
+                    st.caption(f"📈 {len(log['trades'])} trades recorded")
+                if log.get('portfolio_values'):
+                    st.caption(f"📊 {len(log['portfolio_values'])} daily values stored")
+                
+                # Download buttons - Excel and PDF
+                dl_col1, dl_col2 = st.columns(2)
+                with dl_col1:
+                    excel_data = create_excel_with_charts(log['config'], metrics)
+                    st.download_button(
+                        label="📥 Download Excel",
+                        data=excel_data,
+                        file_name=f"{log['name']}.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        key=f"excel_{idx}"
+                    )
+                with dl_col2:
+                    pdf_data = create_pdf_report(log['config'], metrics)
+                    st.download_button(
+                        label="📄 Download PDF",
+                        data=pdf_data,
+                        file_name=f"{log['name']}.pdf",
+                        mime="application/pdf",
+                        key=f"pdf_{idx}"
+                    )
         
         # Clear all logs button
         if st.button("🗑️ Clear All Logs"):
