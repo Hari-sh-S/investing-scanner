@@ -105,15 +105,18 @@ def get_universe(name):
 
 
 def get_all_universe_names():
-    """Get all available universe names from cache."""
+    """Get all available universe names - returns our 60 specified indexes."""
+    # Import from nifty_universe to get the specified list
+    try:
+        from nifty_universe import INDEX_NAMES
+        return INDEX_NAMES.copy()
+    except:
+        pass
+    
+    # Fallback to cache
     cached, _ = load_from_cache()
     if cached:
         return sorted(cached.keys())
-    
-    # Try to get from NSE
-    nse = get_nse_client()
-    if nse:
-        return nse.get_index_list()
     
     return []
 
