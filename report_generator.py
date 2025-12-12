@@ -421,98 +421,72 @@ def create_pdf_report(config, metrics, engine=None):
     story.append(stats_table)
     
     # ==================== EQUITY CURVE CHART ====================
-    # Note: Chart embedding is skipped on Streamlit Cloud due to kaleido/Chrome limitations
-    # Charts are still available in the Excel export and the main app UI
+    # Using matplotlib for PDF charts (works without Chrome/kaleido)
     if engine and hasattr(engine, 'portfolio_df') and not engine.portfolio_df.empty:
         story.append(PageBreak())
         story.append(Paragraph("Performance Charts", section_style))
         
-        # Try to generate charts, but gracefully skip if kaleido/Chrome not available
-        charts_generated = False
         try:
-            import plotly.graph_objects as go
+            import matplotlib
+            matplotlib.use('Agg')  # Non-interactive backend
+            import matplotlib.pyplot as plt
+            import matplotlib.dates as mdates
             
-            # Test if kaleido can write images
-            fig_test = go.Figure()
-            fig_test.add_trace(go.Scatter(x=[1, 2], y=[1, 2]))
-            test_bytes = io.BytesIO()
-            fig_test.write_image(test_bytes, format='png', scale=1)
+            # Equity Curve Chart
+            fig1, ax1 = plt.subplots(figsize=(12, 5))
+            dates = engine.portfolio_df.index
+            values = engine.portfolio_df['Portfolio Value']
             
-            # If we get here, kaleido works - generate actual charts
-            fig = go.Figure()
-            fig.add_trace(go.Scatter(
-                x=engine.portfolio_df.index,
-                y=engine.portfolio_df['Portfolio Value'],
-                fill='tozeroy',
-                line_color='#28A745',
-                name='Portfolio Value'
-            ))
-            fig.update_layout(
-                title="Equity Curve",
-                xaxis_title="Date",
-                yaxis_title="Portfolio Value",
-                height=400,
-                width=900,
-                template='plotly_white',
-                margin=dict(l=50, r=50, t=50, b=50)
-            )
+            ax1.fill_between(dates, values, alpha=0.3, color='#28A745')
+            ax1.plot(dates, values, color='#28A745', linewidth=2)
+            ax1.set_title('Equity Curve', fontsize=14, fontweight='bold', color='#1F4E79')
+            ax1.set_xlabel('Date', fontsize=10)
+            ax1.set_ylabel('Portfolio Value', fontsize=10)
+            ax1.grid(True, alpha=0.3)
+            ax1.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m'))
+            ax1.xaxis.set_major_locator(mdates.MonthLocator(interval=3))
+            plt.xticks(rotation=45)
+            plt.tight_layout()
             
-            chart_bytes = io.BytesIO()
-            fig.write_image(chart_bytes, format='png', scale=2)
-            chart_bytes.seek(0)
-            chart_img = Image(chart_bytes, width=22*cm, height=10*cm)
-            story.append(chart_img)
+            # Save to bytes
+            equity_bytes = io.BytesIO()
+            fig1.savefig(equity_bytes, format='png', dpi=150, bbox_inches='tight', 
+                        facecolor='white', edgecolor='none')
+            equity_bytes.seek(0)
+            plt.close(fig1)
+            
+            equity_img = Image(equity_bytes, width=22*cm, height=9*cm)
+            story.append(equity_img)
             story.append(Spacer(1, 20))
-            charts_generated = True
             
-            # Drawdown chart
-            running_max = engine.portfolio_df['Portfolio Value'].cummax()
-            dd = (engine.portfolio_df['Portfolio Value'] - running_max) / running_max * 100
+            # Drawdown Chart
+            running_max = values.cummax()
+            dd = (values - running_max) / running_max * 100
             
-            fig2 = go.Figure()
-            fig2.add_trace(go.Scatter(
-                x=dd.index,
-                y=dd,
-                fill='tozeroy',
-                line_color='#DC3545',
-                name='Drawdown'
-            ))
-            fig2.update_layout(
-                title="Drawdown Analysis",
-                xaxis_title="Date",
-                yaxis_title="Drawdown %",
-                height=350,
-                width=900,
-                template='plotly_white',
-                margin=dict(l=50, r=50, t=50, b=50)
-            )
+            fig2, ax2 = plt.subplots(figsize=(12, 4))
+            ax2.fill_between(dates, dd, alpha=0.3, color='#DC3545')
+            ax2.plot(dates, dd, color='#DC3545', linewidth=1.5)
+            ax2.set_title('Drawdown Analysis', fontsize=14, fontweight='bold', color='#1F4E79')
+            ax2.set_xlabel('Date', fontsize=10)
+            ax2.set_ylabel('Drawdown %', fontsize=10)
+            ax2.grid(True, alpha=0.3)
+            ax2.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m'))
+            ax2.xaxis.set_major_locator(mdates.MonthLocator(interval=3))
+            plt.xticks(rotation=45)
+            plt.tight_layout()
             
             dd_bytes = io.BytesIO()
-            fig2.write_image(dd_bytes, format='png', scale=2)
+            fig2.savefig(dd_bytes, format='png', dpi=150, bbox_inches='tight',
+                        facecolor='white', edgecolor='none')
             dd_bytes.seek(0)
-            dd_img = Image(dd_bytes, width=22*cm, height=9*cm)
+            plt.close(fig2)
+            
+            dd_img = Image(dd_bytes, width=22*cm, height=7*cm)
             story.append(dd_img)
-                
+            
         except Exception:
-            # Kaleido not available or Chrome missing - provide note instead
-            if not charts_generated:
-                note_style = ParagraphStyle(
-                    'ChartNote',
-                    parent=styles['Normal'],
-                    fontSize=10,
-                    textColor=colors.HexColor('#666666'),
-                    alignment=TA_CENTER,
-                    spaceBefore=20,
-                    spaceAfter=20
-                )
-                story.append(Paragraph(
-                    "Charts are available in the Excel export and the web application interface.",
-                    note_style
-                ))
-                story.append(Paragraph(
-                    "(PDF chart embedding requires local Chrome/Chromium installation)",
-                    note_style
-                ))
+            # If matplotlib fails for any reason, just skip charts silently
+            pass
     
     # ==================== MONTHLY RETURNS ====================
     if engine and hasattr(engine, 'get_monthly_returns'):
