@@ -87,7 +87,7 @@ class PortfolioEngine:
         return value
 
     def download_and_cache_universe(self, universe_tickers, progress_callback=None, stop_flag=None):
-        """Sequential download with indicators calculated immediately."""
+        """Batch download using yfinance native batch - much faster than sequential."""
         import time
 
         # Filter already cached
@@ -102,55 +102,64 @@ class PortfolioEngine:
 
         success_count = 0
         start_time = time.time()
-        last_update = start_time
-
-        # Sequential download (more reliable on Streamlit Cloud)
-        for i, ticker in enumerate(tickers_to_download):
-            # Check stop flag
+        
+        # Convert to .NS format
+        tickers_ns = [t if t.endswith(('.NS', '.BO')) else f"{t}.NS" for t in tickers_to_download]
+        ticker_map = dict(zip(tickers_ns, tickers_to_download))
+        
+        # Download in batches of 50 (balance between speed and reliability)
+        batch_size = 50
+        total_batches = (len(tickers_ns) + batch_size - 1) // batch_size
+        
+        for batch_idx in range(total_batches):
             if stop_flag and stop_flag[0]:
-                print(f"Stopped at {i}/{len(tickers_to_download)}")
+                print(f"Stopped at batch {batch_idx}/{total_batches}")
                 break
-
+                
+            batch_start = batch_idx * batch_size
+            batch_end = min(batch_start + batch_size, len(tickers_ns))
+            batch_tickers = tickers_ns[batch_start:batch_end]
+            
             try:
-                ticker_ns = ticker if ticker.endswith(('.NS', '.BO')) else f"{ticker}.NS"
-                df = yf.download(ticker_ns, period="max", interval="1d", progress=False, auto_adjust=True)
-
-                if not df.empty and len(df) >= 100:
-                    # Reset index to make Date a column
-                    df.reset_index(inplace=True)
-
-                    # Keep only OHLCV columns
-                    expected_cols = ['Date', 'Open', 'High', 'Low', 'Close', 'Volume']
-                    df = df[[col for col in expected_cols if col in df.columns]]
-                    
-                    # Calculate indicators
-                    try:
-                        df_with_date_index = df.set_index('Date')
-                        df_with_date_index = IndicatorLibrary.add_momentum_volatility_metrics(df_with_date_index)
-                        df_with_date_index = IndicatorLibrary.add_regime_filters(df_with_date_index)
-                        df = df_with_date_index.reset_index()
-                    except Exception as e:
-                        print(f"Indicator calculation failed for {ticker}: {e}")
-
-                    if self.cache:
-                        self.cache.set(ticker, df)
+                # Batch download
+                if len(batch_tickers) == 1:
+                    df_all = yf.download(batch_tickers[0], period="max", interval="1d", progress=False, auto_adjust=True)
+                    if not df_all.empty:
+                        df_all = df_all.reset_index()
+                        df_all.columns = ['Date', 'Open', 'High', 'Low', 'Close', 'Volume'] if len(df_all.columns) == 6 else df_all.columns
+                        ticker = ticker_map[batch_tickers[0]]
+                        self._process_and_cache_df(ticker, df_all)
                         success_count += 1
-
-                # Update progress every 3 seconds
-                current_time = time.time()
-                if progress_callback and (current_time - last_update >= 3.0 or i == len(tickers_to_download) - 1):
-                    elapsed = current_time - start_time
-                    avg = elapsed / (i + 1) if (i + 1) > 0 else 0
-                    remaining_time = avg * (len(tickers_to_download) - (i + 1))
-                    try:
-                        progress_callback(i + 1, len(tickers_to_download), ticker, remaining_time)
-                    except TypeError:
-                        progress_callback(i + 1, len(tickers_to_download), ticker)
-                    last_update = current_time
-
+                else:
+                    df_all = yf.download(batch_tickers, period="max", interval="1d", progress=False, auto_adjust=True, group_by='ticker')
+                    
+                    for ticker_ns in batch_tickers:
+                        try:
+                            ticker = ticker_map[ticker_ns]
+                            if ticker_ns in df_all.columns.get_level_values(0):
+                                ticker_df = df_all[ticker_ns].copy()
+                                ticker_df = ticker_df.reset_index()
+                                if not ticker_df.empty and len(ticker_df.dropna()) >= 100:
+                                    self._process_and_cache_df(ticker, ticker_df)
+                                    success_count += 1
+                        except Exception as e:
+                            print(f"Error processing {ticker_ns}: {e}")
+                            
             except Exception as e:
-                print(f"Download error for {ticker}: {e}")
-                continue
+                print(f"Batch {batch_idx + 1} download error: {e}")
+            
+            # Update progress
+            if progress_callback:
+                completed = min(batch_end, len(tickers_to_download))
+                elapsed = time.time() - start_time
+                avg = elapsed / completed if completed > 0 else 0
+                remaining_time = avg * (len(tickers_to_download) - completed)
+                try:
+                    progress_callback(completed, len(tickers_to_download), f"Batch {batch_idx + 1}/{total_batches}", remaining_time)
+                except TypeError:
+                    progress_callback(completed, len(tickers_to_download), f"Batch {batch_idx + 1}")
+            
+            time.sleep(0.5)  # Small delay between batches
 
         # Final update
         if progress_callback:
@@ -161,6 +170,27 @@ class PortfolioEngine:
 
         print(f"Downloaded {success_count}/{len(tickers_to_download)} stocks in {time.time() - start_time:.1f}s")
         return len(universe_tickers)
+    
+    def _process_and_cache_df(self, ticker, df):
+        """Process dataframe and save to cache with indicators."""
+        try:
+            # Ensure proper column names
+            expected_cols = ['Date', 'Open', 'High', 'Low', 'Close', 'Volume']
+            df = df[[col for col in expected_cols if col in df.columns]]
+            
+            # Calculate indicators
+            try:
+                df_with_date_index = df.set_index('Date')
+                df_with_date_index = IndicatorLibrary.add_momentum_volatility_metrics(df_with_date_index)
+                df_with_date_index = IndicatorLibrary.add_regime_filters(df_with_date_index)
+                df = df_with_date_index.reset_index()
+            except:
+                pass  # Use raw data if indicators fail
+            
+            if self.cache:
+                self.cache.set(ticker, df)
+        except Exception as e:
+            print(f"Error caching {ticker}: {e}")
 
     def fetch_data(self, progress_callback=None):
         """Fetch data from cache. Indicators should already be pre-calculated during download."""
