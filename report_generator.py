@@ -421,14 +421,24 @@ def create_pdf_report(config, metrics, engine=None):
     story.append(stats_table)
     
     # ==================== EQUITY CURVE CHART ====================
+    # Note: Chart embedding is skipped on Streamlit Cloud due to kaleido/Chrome limitations
+    # Charts are still available in the Excel export and the main app UI
     if engine and hasattr(engine, 'portfolio_df') and not engine.portfolio_df.empty:
         story.append(PageBreak())
         story.append(Paragraph("Performance Charts", section_style))
         
+        # Try to generate charts, but gracefully skip if kaleido/Chrome not available
+        charts_generated = False
         try:
             import plotly.graph_objects as go
             
-            # Create equity curve
+            # Test if kaleido can write images
+            fig_test = go.Figure()
+            fig_test.add_trace(go.Scatter(x=[1, 2], y=[1, 2]))
+            test_bytes = io.BytesIO()
+            fig_test.write_image(test_bytes, format='png', scale=1)
+            
+            # If we get here, kaleido works - generate actual charts
             fig = go.Figure()
             fig.add_trace(go.Scatter(
                 x=engine.portfolio_df.index,
@@ -440,25 +450,22 @@ def create_pdf_report(config, metrics, engine=None):
             fig.update_layout(
                 title="Equity Curve",
                 xaxis_title="Date",
-                yaxis_title="Portfolio Value (₹)",
+                yaxis_title="Portfolio Value",
                 height=400,
                 width=900,
                 template='plotly_white',
                 margin=dict(l=50, r=50, t=50, b=50)
             )
             
-            # Save chart as image
             chart_bytes = io.BytesIO()
-            try:
-                fig.write_image(chart_bytes, format='png', scale=2)
-                chart_bytes.seek(0)
-                chart_img = Image(chart_bytes, width=22*cm, height=10*cm)
-                story.append(chart_img)
-                story.append(Spacer(1, 20))
-            except Exception as e:
-                story.append(Paragraph(f"[Chart generation requires kaleido package: {e}]", styles['Normal']))
+            fig.write_image(chart_bytes, format='png', scale=2)
+            chart_bytes.seek(0)
+            chart_img = Image(chart_bytes, width=22*cm, height=10*cm)
+            story.append(chart_img)
+            story.append(Spacer(1, 20))
+            charts_generated = True
             
-            # Create drawdown chart
+            # Drawdown chart
             running_max = engine.portfolio_df['Portfolio Value'].cummax()
             dd = (engine.portfolio_df['Portfolio Value'] - running_max) / running_max * 100
             
@@ -481,16 +488,31 @@ def create_pdf_report(config, metrics, engine=None):
             )
             
             dd_bytes = io.BytesIO()
-            try:
-                fig2.write_image(dd_bytes, format='png', scale=2)
-                dd_bytes.seek(0)
-                dd_img = Image(dd_bytes, width=22*cm, height=9*cm)
-                story.append(dd_img)
-            except Exception:
-                pass
+            fig2.write_image(dd_bytes, format='png', scale=2)
+            dd_bytes.seek(0)
+            dd_img = Image(dd_bytes, width=22*cm, height=9*cm)
+            story.append(dd_img)
                 
-        except ImportError:
-            story.append(Paragraph("[Plotly required for charts]", styles['Normal']))
+        except Exception:
+            # Kaleido not available or Chrome missing - provide note instead
+            if not charts_generated:
+                note_style = ParagraphStyle(
+                    'ChartNote',
+                    parent=styles['Normal'],
+                    fontSize=10,
+                    textColor=colors.HexColor('#666666'),
+                    alignment=TA_CENTER,
+                    spaceBefore=20,
+                    spaceAfter=20
+                )
+                story.append(Paragraph(
+                    "Charts are available in the Excel export and the web application interface.",
+                    note_style
+                ))
+                story.append(Paragraph(
+                    "(PDF chart embedding requires local Chrome/Chromium installation)",
+                    note_style
+                ))
     
     # ==================== MONTHLY RETURNS ====================
     if engine and hasattr(engine, 'get_monthly_returns'):
