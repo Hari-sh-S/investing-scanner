@@ -117,6 +117,15 @@ class PortfolioEngine:
                     expected_cols = ['Date', 'Open', 'High', 'Low', 'Close', 'Volume']
                     df = df[[col for col in expected_cols if col in df.columns]]
                     
+                    # CRITICAL: Remove duplicates and sort by date
+                    if 'Date' in df.columns:
+                        df['Date'] = pd.to_datetime(df['Date'])
+                        df = df.drop_duplicates(subset=['Date'], keep='last')
+                        df = df.sort_values('Date').reset_index(drop=True)
+                    
+                    # Remove any rows with NaN in critical columns
+                    df = df.dropna(subset=['Close'])
+                    
                     # Calculate indicators
                     try:
                         df_with_date_index = df.set_index('Date')
@@ -180,6 +189,20 @@ class PortfolioEngine:
         print(f"Loading data for {len(self.universe)} stocks...")
         tickers_to_download = []
 
+        def clean_dataframe(df):
+            """Remove duplicates and ensure clean data."""
+            if df is None or df.empty:
+                return df
+            # Remove duplicate indices (dates)
+            if df.index.duplicated().any():
+                df = df[~df.index.duplicated(keep='last')]
+            # Sort by date
+            df = df.sort_index()
+            # Remove NaN close prices
+            if 'Close' in df.columns:
+                df = df.dropna(subset=['Close'])
+            return df
+
         # First, try to load from cache
         for i, ticker in enumerate(self.universe):
             if progress_callback:
@@ -191,11 +214,15 @@ class PortfolioEngine:
                     # Fix index - Date should be the index
                     if 'Date' in cached_data.columns:
                         cached_data['Date'] = pd.to_datetime(cached_data['Date'])
+                        cached_data = cached_data.drop_duplicates(subset=['Date'], keep='last')
                         cached_data.set_index('Date', inplace=True)
 
                     # Ensure index is datetime
                     if not isinstance(cached_data.index, pd.DatetimeIndex):
                         cached_data.index = pd.to_datetime(cached_data.index)
+
+                    # Clean data - remove duplicates
+                    cached_data = clean_dataframe(cached_data)
 
                     # Filter to date range
                     mask = (cached_data.index >= pd.Timestamp(self.start_date)) & \
@@ -222,11 +249,15 @@ class PortfolioEngine:
                         # Fix index - Date should be the index
                         if 'Date' in cached_data.columns:
                             cached_data['Date'] = pd.to_datetime(cached_data['Date'])
+                            cached_data = cached_data.drop_duplicates(subset=['Date'], keep='last')
                             cached_data.set_index('Date', inplace=True)
 
                         # Ensure index is datetime
                         if not isinstance(cached_data.index, pd.DatetimeIndex):
                             cached_data.index = pd.to_datetime(cached_data.index)
+
+                        # Clean data
+                        cached_data = clean_dataframe(cached_data)
 
                         mask = (cached_data.index >= pd.Timestamp(self.start_date)) & \
                                (cached_data.index <= pd.Timestamp(self.end_date))
