@@ -120,16 +120,10 @@ class PortfolioEngine:
             # Batch download with threads
             batch_result = self._download_batch(chunk, ticker_map)
             
-            # Process results and fallback for failed tickers
+            # Count successes - no slow fallback
             for ticker_ns in chunk:
-                ticker = ticker_map[ticker_ns]
                 if batch_result.get(ticker_ns, False):
                     success_count += 1
-                else:
-                    # Fallback to single download
-                    if self._download_single(ticker_ns, ticker):
-                        success_count += 1
-                
                 completed += 1
             
             # Update progress after each chunk
@@ -138,9 +132,9 @@ class PortfolioEngine:
                 avg = elapsed / completed if completed > 0 else 0
                 remaining_time = avg * (len(tickers_to_download) - completed)
                 try:
-                    progress_callback(completed, len(tickers_to_download), f"Chunk {chunk_idx + 1}/{len(chunks)}", remaining_time)
+                    progress_callback(completed, len(tickers_to_download), f"Batch {chunk_idx + 1}/{len(chunks)}", remaining_time)
                 except TypeError:
-                    progress_callback(completed, len(tickers_to_download), f"Chunk {chunk_idx + 1}")
+                    progress_callback(completed, len(tickers_to_download), f"Batch {chunk_idx + 1}")
 
         if progress_callback:
             try:
@@ -176,7 +170,11 @@ class PortfolioEngine:
                     df = data[ticker_ns].dropna(how="all")
                     if not df.empty and len(df) >= 100:
                         df = df.reset_index()
-                        self._process_and_cache_df(ticker, df)
+                        # Save without indicators for speed - indicators calculated on fetch
+                        expected_cols = ['Date', 'Open', 'High', 'Low', 'Close', 'Volume']
+                        df = df[[col for col in expected_cols if col in df.columns]]
+                        if self.cache:
+                            self.cache.set(ticker, df)
                         saved[ticker_ns] = True
                     else:
                         saved[ticker_ns] = False
@@ -189,24 +187,30 @@ class PortfolioEngine:
                 ticker = ticker_map[ticker_ns]
                 df = data.dropna(how="all").reset_index()
                 if len(df) >= 100:
-                    self._process_and_cache_df(ticker, df)
+                    expected_cols = ['Date', 'Open', 'High', 'Low', 'Close', 'Volume']
+                    df = df[[col for col in expected_cols if col in df.columns]]
+                    if self.cache:
+                        self.cache.set(ticker, df)
                     saved[ticker_ns] = True
         
         return saved
     
-    def _download_single(self, ticker_ns, ticker, retries=3, backoff=2):
-        """Download single ticker with retry and backoff."""
+    def _download_single(self, ticker_ns, ticker, retries=2, backoff=1):
+        """Download single ticker with minimal retry."""
         import time
         for attempt in range(1, retries + 1):
             try:
                 df = yf.download(ticker_ns, period="max", interval="1d", progress=False)
                 if not df.empty and len(df) >= 100:
                     df = df.reset_index()
-                    self._process_and_cache_df(ticker, df)
+                    expected_cols = ['Date', 'Open', 'High', 'Low', 'Close', 'Volume']
+                    df = df[[col for col in expected_cols if col in df.columns]]
+                    if self.cache:
+                        self.cache.set(ticker, df)
                     return True
             except Exception:
                 pass
-            time.sleep(backoff ** attempt)
+            time.sleep(backoff)
         return False
     
     def _process_and_cache_df(self, ticker, df):
