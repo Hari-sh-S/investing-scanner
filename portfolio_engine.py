@@ -87,7 +87,7 @@ class PortfolioEngine:
         return value
 
     def download_and_cache_universe(self, universe_tickers, progress_callback=None, stop_flag=None):
-        """Sequential download with indicators calculated immediately."""
+        """Fast batch download with fallback to single ticker download."""
         import time
 
         # Filter already cached
@@ -102,48 +102,45 @@ class PortfolioEngine:
 
         success_count = 0
         start_time = time.time()
-        last_update = start_time
-
-        for i, ticker in enumerate(tickers_to_download):
+        
+        # Convert to .NS format for yfinance
+        tickers_ns = [t if t.endswith(('.NS', '.BO')) else f"{t}.NS" for t in tickers_to_download]
+        ticker_map = {ns: orig for ns, orig in zip(tickers_ns, tickers_to_download)}
+        
+        # Download in chunks of 200 (optimal batch size)
+        CHUNK_SIZE = 200
+        chunks = [tickers_ns[i:i + CHUNK_SIZE] for i in range(0, len(tickers_ns), CHUNK_SIZE)]
+        
+        completed = 0
+        for chunk_idx, chunk in enumerate(chunks):
             if stop_flag and stop_flag[0]:
-                print(f"Stopped at {i}/{len(tickers_to_download)}")
+                print(f"Stopped at chunk {chunk_idx}/{len(chunks)}")
                 break
-
-            try:
-                ticker_ns = ticker if ticker.endswith(('.NS', '.BO')) else f"{ticker}.NS"
-                df = yf.download(ticker_ns, period="max", interval="1d", progress=False, auto_adjust=True)
-
-                if not df.empty and len(df) >= 100:
-                    df.reset_index(inplace=True)
-                    expected_cols = ['Date', 'Open', 'High', 'Low', 'Close', 'Volume']
-                    df = df[[col for col in expected_cols if col in df.columns]]
-                    
-                    try:
-                        df_with_date_index = df.set_index('Date')
-                        df_with_date_index = IndicatorLibrary.add_momentum_volatility_metrics(df_with_date_index)
-                        df_with_date_index = IndicatorLibrary.add_regime_filters(df_with_date_index)
-                        df = df_with_date_index.reset_index()
-                    except Exception as e:
-                        print(f"Indicator calculation failed for {ticker}: {e}")
-
-                    if self.cache:
-                        self.cache.set(ticker, df)
+            
+            # Batch download with threads
+            batch_result = self._download_batch(chunk, ticker_map)
+            
+            # Process results and fallback for failed tickers
+            for ticker_ns in chunk:
+                ticker = ticker_map[ticker_ns]
+                if batch_result.get(ticker_ns, False):
+                    success_count += 1
+                else:
+                    # Fallback to single download
+                    if self._download_single(ticker_ns, ticker):
                         success_count += 1
-
-                current_time = time.time()
-                if progress_callback and (current_time - last_update >= 3.0 or i == len(tickers_to_download) - 1):
-                    elapsed = current_time - start_time
-                    avg = elapsed / (i + 1) if (i + 1) > 0 else 0
-                    remaining_time = avg * (len(tickers_to_download) - (i + 1))
-                    try:
-                        progress_callback(i + 1, len(tickers_to_download), ticker, remaining_time)
-                    except TypeError:
-                        progress_callback(i + 1, len(tickers_to_download), ticker)
-                    last_update = current_time
-
-            except Exception as e:
-                print(f"Download error for {ticker}: {e}")
-                continue
+                
+                completed += 1
+            
+            # Update progress after each chunk
+            if progress_callback:
+                elapsed = time.time() - start_time
+                avg = elapsed / completed if completed > 0 else 0
+                remaining_time = avg * (len(tickers_to_download) - completed)
+                try:
+                    progress_callback(completed, len(tickers_to_download), f"Chunk {chunk_idx + 1}/{len(chunks)}", remaining_time)
+                except TypeError:
+                    progress_callback(completed, len(tickers_to_download), f"Chunk {chunk_idx + 1}")
 
         if progress_callback:
             try:
@@ -151,8 +148,86 @@ class PortfolioEngine:
             except TypeError:
                 progress_callback(len(tickers_to_download), len(tickers_to_download), "Done")
 
-        print(f"Downloaded {success_count}/{len(tickers_to_download)} stocks in {time.time() - start_time:.1f}s")
+        elapsed = time.time() - start_time
+        print(f"Downloaded {success_count}/{len(tickers_to_download)} stocks in {elapsed:.1f}s ({elapsed/max(len(tickers_to_download),1):.2f}s/stock)")
         return len(universe_tickers)
+    
+    def _download_batch(self, tickers, ticker_map):
+        """Batch download multiple tickers at once using threads."""
+        try:
+            data = yf.download(
+                tickers,
+                period="max",
+                interval="1d",
+                group_by="ticker",
+                threads=True,
+                progress=False,
+            )
+        except Exception as e:
+            print(f"Batch download failed: {e}")
+            return {}
+        
+        saved = {}
+        
+        if isinstance(data.columns, pd.MultiIndex):
+            for ticker_ns in tickers:
+                try:
+                    ticker = ticker_map[ticker_ns]
+                    df = data[ticker_ns].dropna(how="all")
+                    if not df.empty and len(df) >= 100:
+                        df = df.reset_index()
+                        self._process_and_cache_df(ticker, df)
+                        saved[ticker_ns] = True
+                    else:
+                        saved[ticker_ns] = False
+                except Exception:
+                    saved[ticker_ns] = False
+        else:
+            # Single ticker result (different format)
+            if len(tickers) == 1 and not data.empty:
+                ticker_ns = tickers[0]
+                ticker = ticker_map[ticker_ns]
+                df = data.dropna(how="all").reset_index()
+                if len(df) >= 100:
+                    self._process_and_cache_df(ticker, df)
+                    saved[ticker_ns] = True
+        
+        return saved
+    
+    def _download_single(self, ticker_ns, ticker, retries=3, backoff=2):
+        """Download single ticker with retry and backoff."""
+        import time
+        for attempt in range(1, retries + 1):
+            try:
+                df = yf.download(ticker_ns, period="max", interval="1d", progress=False)
+                if not df.empty and len(df) >= 100:
+                    df = df.reset_index()
+                    self._process_and_cache_df(ticker, df)
+                    return True
+            except Exception:
+                pass
+            time.sleep(backoff ** attempt)
+        return False
+    
+    def _process_and_cache_df(self, ticker, df):
+        """Process dataframe and save to cache with indicators."""
+        try:
+            expected_cols = ['Date', 'Open', 'High', 'Low', 'Close', 'Volume']
+            df = df[[col for col in expected_cols if col in df.columns]]
+            
+            # Calculate indicators
+            try:
+                df_with_date_index = df.set_index('Date')
+                df_with_date_index = IndicatorLibrary.add_momentum_volatility_metrics(df_with_date_index)
+                df_with_date_index = IndicatorLibrary.add_regime_filters(df_with_date_index)
+                df = df_with_date_index.reset_index()
+            except:
+                pass  # Use raw data if indicators fail
+            
+            if self.cache:
+                self.cache.set(ticker, df)
+        except Exception as e:
+            print(f"Error caching {ticker}: {e}")
 
     def fetch_data(self, progress_callback=None):
         """Fetch data from cache. Indicators should already be pre-calculated during download."""
