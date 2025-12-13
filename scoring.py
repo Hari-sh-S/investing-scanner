@@ -136,49 +136,11 @@ class ScoreParser:
 
     def calculate_scores(self, df, formula):
         """
-        Vectorized calculation of scores for entire dataframe.
+        Calculate scores for entire dataframe using row-by-row processing.
         Returns a Series of scores.
         """
-        # Create column name mapping - convert to valid Python identifiers
-        # Can't start with numbers, so convert "6 Month Performance" to "M6_Performance"
-        def make_var_name(metric):
-            parts = metric.split()
-            if parts[0].isdigit() or (len(parts) > 1 and parts[1] in ['Month', 'Year']):
-                # "6 Month Performance" -> "M6_Performance"
-                # "1 Year Performance" -> "Y1_Performance"
-                period = parts[0]
-                unit = 'M' if 'Month' in metric else 'Y'
-                rest = '_'.join(parts[2:]) if len(parts) > 2 else parts[-1]
-                return f"{unit}{period}_{rest}"
-            return metric.replace(' ', '_').replace('-', '_')
-        
-        col_map = {metric: make_var_name(metric) for metric in self.allowed_metrics}
-        
-        # Create a copy with renamed columns
-        temp_df = df.copy()
-        for original, renamed in col_map.items():
-            if original in temp_df.columns:
-                temp_df[renamed] = temp_df[original]
-        
-        processed_formula = self._preprocess_formula(formula)
-        
-        # Replace metric names with column variable names
-        for metric, var_name in sorted(col_map.items(), key=lambda x: len(x[0]), reverse=True):
-            processed_formula = processed_formula.replace(metric, var_name)
-            
-        try:
-            # Use pandas eval for performance
-            scores = temp_df.eval(processed_formula, engine='python')
-            
-            # Handle inf and nan
-            scores = scores.replace([np.inf, -np.inf], 0)
-            scores = scores.fillna(0)
-            
-            return scores
-        except Exception as e:
-            print(f"Scoring Error: {e}")
-            # Fallback to row-by-row
-            return df.apply(lambda row: self.parse_and_calculate(formula, row), axis=1)
+        # Use reliable row-by-row calculation
+        return df.apply(lambda row: self.parse_and_calculate(formula, row), axis=1)
     
     def get_example_formulas(self):
         """Returns a dictionary of example formulas with descriptions."""
