@@ -239,7 +239,7 @@ class PortfolioEngine:
         tickers_to_download = []
 
         def clean_dataframe(df):
-            """Remove duplicates and ensure clean data. Returns None if cleaning fails."""
+            """Remove duplicates, detect anomalies, and ensure clean data."""
             try:
                 if df is None or df.empty:
                     return df
@@ -248,6 +248,23 @@ class PortfolioEngine:
                     df = df[~df.index.duplicated(keep='last')]
                 # Sort by date
                 df = df.sort_index()
+                
+                # DATA QUALITY: Detect and fix extreme single-day price changes (>50%)
+                # These are almost always data errors from yfinance
+                if 'Close' in df.columns and len(df) > 3:
+                    close = df['Close'].copy()
+                    pct_change = close.pct_change().abs()
+                    # Mark days with >50% change that recover next day as bad data
+                    for i in range(1, len(pct_change) - 1):
+                        if pct_change.iloc[i] > 0.5:  # >50% change
+                            next_change = pct_change.iloc[i + 1] if i + 1 < len(pct_change) else 0
+                            if next_change > 0.3:  # If it reverses next day
+                                # Interpolate the bad price
+                                df.iloc[i, df.columns.get_loc('Close')] = (
+                                    close.iloc[i - 1] + close.iloc[i + 1]
+                                ) / 2
+                                print(f"Fixed anomaly: {df.index[i]}")
+                
                 return df
             except Exception:
                 return df  # Return unchanged if cleaning fails
