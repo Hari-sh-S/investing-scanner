@@ -668,14 +668,17 @@ with main_tabs[0]:
                             # Only major indices (those with Yahoo Finance data)
                             benchmark_options = ["NIFTY 50", "NIFTY 100", "NIFTY 500", "NIFTY BANK", "NIFTY IT", "NIFTY MIDCAP 100", "NIFTY SMLCAP 100", "NIFTY NEXT 50", "NIFTY FIN SERVICE"]
                             
-                            # Default to NIFTY 50 and auto-load
-                            if 'benchmark_selection' not in st.session_state:
-                                st.session_state['benchmark_selection'] = "NIFTY 50"
+                            # Get stored selection or default to NIFTY 50
+                            stored_benchmark = st.session_state.get('benchmark_selection', 'NIFTY 50')
+                            try:
+                                default_idx = benchmark_options.index(stored_benchmark)
+                            except ValueError:
+                                default_idx = 0  # Fall back to first option
                             
                             selected_benchmark = st.selectbox(
                                 "Select Benchmark Index", 
                                 benchmark_options,
-                                index=benchmark_options.index(st.session_state.get('benchmark_selection', 'NIFTY 50')),
+                                index=default_idx,
                                 key="benchmark_selector"
                             )
                             st.session_state['benchmark_selection'] = selected_benchmark
