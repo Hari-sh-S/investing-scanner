@@ -792,8 +792,21 @@ with main_tabs[2]:
     # Download All Data Button
     st.markdown("### 🔽 Download All Universe Data")
     st.info("This will download and cache data for ALL stocks across ALL universes. Takes ~10-15 minutes.")
+    
+    # Clear cache option
+    col_clear, col_download = st.columns(2)
+    with col_clear:
+        if st.button("🗑️ Clear Cache First", key="clear_cache"):
+            from portfolio_engine import DataCache
+            cache = DataCache()
+            cache.clear()
+            st.success("✅ Cache cleared! Now click 'Download All Data' to get fresh data.")
+            st.rerun()
+    
+    with col_download:
+        download_clicked = st.button("📥 Download All Data", type="primary", key="download_all")
 
-    if st.button("📥 Download All Data", type="primary", key="download_all"):
+    if download_clicked:
         # Get all unique tickers from all universes
         all_tickers = set()
         all_universe_names = get_all_universe_names()
