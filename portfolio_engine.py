@@ -26,7 +26,11 @@ class DataCache:
             return None
 
         try:
-            return pd.read_parquet(cache_path)
+            df = pd.read_parquet(cache_path)
+            # Fix MultiIndex columns from old cache format
+            if isinstance(df.columns, pd.MultiIndex):
+                df.columns = [col[0] if isinstance(col, tuple) else col for col in df.columns]
+            return df
         except Exception as e:
             print(f"Cache read error for {ticker}: {e}")
             return None
