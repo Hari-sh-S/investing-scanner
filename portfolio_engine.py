@@ -635,6 +635,8 @@ class PortfolioEngine:
                 # Debug: Log allocations on rebalance days
                 if stocks_target == 0:
                     print(f"REBALANCE {date.date()}: REGIME={regime_triggered} ({regime_action}) - NO STOCKS, uncorrelated={uncorrelated_target:.0f}")
+                else:
+                    print(f"REBALANCE {date.date()}: REGIME={regime_triggered} - stocks={stocks_target:.0f}")
                 
                 # Execute uncorrelated asset purchase with calculated target
                 if uncorrelated_target > 0 and uncorrelated_config:
