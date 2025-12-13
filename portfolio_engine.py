@@ -321,6 +321,30 @@ class PortfolioEngine:
 
         print(f"Successfully loaded {len(self.data)} stocks")
         return len(self.data) > 0
+    
+    def calculate_indicators_for_formula(self, formula, regime_config=None):
+        """Calculate only the indicators needed for the formula and regime filter."""
+        # Determine which indicator types are needed
+        needs_momentum = any(x in formula.upper() for x in ['PERFORMANCE', 'SHARPE', 'SORTINO', 'CALMAR', 'VOLATILITY', 'DRAWDOWN'])
+        needs_regime = regime_config is not None and regime_config.get('type') != 'EQUITY'
+        
+        if not needs_momentum and not needs_regime:
+            return  # No indicators needed
+        
+        print(f"Calculating indicators (momentum={needs_momentum}, regime={needs_regime})...")
+        
+        for ticker in self.data:
+            try:
+                df = self.data[ticker]
+                # Only calculate if not already calculated
+                if needs_momentum and '6 Month Performance' not in df.columns:
+                    df = IndicatorLibrary.add_momentum_volatility_metrics(df)
+                    self.data[ticker] = df
+                if needs_regime and 'EMA_200' not in df.columns:
+                    df = IndicatorLibrary.add_regime_filters(df)
+                    self.data[ticker] = df
+            except Exception as e:
+                print(f"Error calculating indicators for {ticker}: {e}")
 
     def _get_rebalance_dates(self, all_dates, rebal_config):
         """Generate rebalance dates based on config. Ensures every period has a rebalance."""
@@ -465,6 +489,9 @@ class PortfolioEngine:
         if not is_valid:
             print(f"Invalid formula: {msg}")
             return
+        
+        # Calculate indicators on-demand based on formula
+        self.calculate_indicators_for_formula(scoring_formula, regime_config)
         
         # Load regime filter index data if needed
         if regime_config and regime_config['type'] != 'EQUITY':
