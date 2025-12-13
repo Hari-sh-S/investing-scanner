@@ -139,8 +139,20 @@ class ScoreParser:
         Vectorized calculation of scores for entire dataframe.
         Returns a Series of scores.
         """
-        # Create column name mapping (spaces to underscores)
-        col_map = {metric: metric.replace(' ', '_').replace('-', '_') for metric in self.allowed_metrics}
+        # Create column name mapping - convert to valid Python identifiers
+        # Can't start with numbers, so convert "6 Month Performance" to "M6_Performance"
+        def make_var_name(metric):
+            parts = metric.split()
+            if parts[0].isdigit() or (len(parts) > 1 and parts[1] in ['Month', 'Year']):
+                # "6 Month Performance" -> "M6_Performance"
+                # "1 Year Performance" -> "Y1_Performance"
+                period = parts[0]
+                unit = 'M' if 'Month' in metric else 'Y'
+                rest = '_'.join(parts[2:]) if len(parts) > 2 else parts[-1]
+                return f"{unit}{period}_{rest}"
+            return metric.replace(' ', '_').replace('-', '_')
+        
+        col_map = {metric: make_var_name(metric) for metric in self.allowed_metrics}
         
         # Create a copy with renamed columns
         temp_df = df.copy()
