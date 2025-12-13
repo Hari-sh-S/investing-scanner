@@ -796,7 +796,7 @@ with main_tabs[2]:
     # Clear cache option
     col_clear, col_download = st.columns(2)
     with col_clear:
-        if st.button("🗑️ Clear Cache First", key="clear_cache"):
+        if st.button("🗑️ Clear Cache First", key="clear_data_cache_btn"):
             from portfolio_engine import DataCache
             cache = DataCache()
             cache.clear()
@@ -804,7 +804,7 @@ with main_tabs[2]:
             st.rerun()
     
     with col_download:
-        download_clicked = st.button("📥 Download All Data", type="primary", key="download_all")
+        download_clicked = st.button("📥 Download All Data", type="primary", key="download_all_data_btn")
 
     if download_clicked:
         # Get all unique tickers from all universes
