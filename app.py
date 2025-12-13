@@ -414,6 +414,16 @@ with main_tabs[0]:
                         st.session_state.backtest_logs.append(backtest_log)
                         save_backtest_logs(st.session_state.backtest_logs)  # Save to file
                         
+                        # Store current backtest data in session_state for persistence
+                        st.session_state['current_backtest'] = {
+                            'engine': engine,
+                            'metrics': metrics,
+                            'backtest_log': backtest_log,
+                            'start_date': start_date,
+                            'end_date': end_date
+                        }
+                        st.session_state['current_backtest_active'] = True
+                        
                         st.markdown("---")
                         
                         # Action buttons - Excel and PDF downloads
@@ -437,8 +447,8 @@ with main_tabs[0]:
                                 mime="application/pdf"
                             )
                         
-                        # Result tabs
-                        result_tabs = st.tabs(["Performance Metrics", "Charts", "Monthly Breakup", "Monthly Report", "Trade History", "Benchmark Comparison"])
+                        # Result tabs (Benchmark Comparison is now a standalone section below)
+                        result_tabs = st.tabs(["Performance Metrics", "Charts", "Monthly Breakup", "Monthly Report", "Trade History"])
                         
                         with result_tabs[0]:
                             st.markdown("### Key Performance Indicators")
@@ -645,139 +655,101 @@ with main_tabs[0]:
                                     st.info("No completed trades to display")
                             else:
                                 st.info("No trades executed")
-                        
-                        with result_tabs[5]:
-                            st.markdown("### Benchmark Comparison")
-                            
-                            # Get all available indexes from nifty_universe
-                            from nifty_universe import INDEX_NAMES
-                            
-                            # Common Yahoo Finance index mappings (for major ones)
-                            yahoo_index_map = {
-                                "NIFTY 50": "^NSEI",
-                                "NIFTY 100": "^CNX100", 
-                                "NIFTY 500": "^CRSLDX",
-                                "NIFTY BANK": "^NSEBANK",
-                                "NIFTY IT": "^CNXIT",
-                                "NIFTY MIDCAP 100": "^CNXMDCP",
-                                "NIFTY SMLCAP 100": "^CNXSMLCAP",
-                                "NIFTY NEXT 50": "^NSMIDCP",
-                                "NIFTY FIN SERVICE": "^CNXFIN",
-                            }
-                            
-                            # Only major indices (those with Yahoo Finance data)
-                            benchmark_options = ["NIFTY 50", "NIFTY 100", "NIFTY 500", "NIFTY BANK", "NIFTY IT", "NIFTY MIDCAP 100", "NIFTY SMLCAP 100", "NIFTY NEXT 50", "NIFTY FIN SERVICE"]
-                            
-                            # Get stored selection or default to NIFTY 50
-                            stored_benchmark = st.session_state.get('benchmark_selection', 'NIFTY 50')
-                            try:
-                                default_idx = benchmark_options.index(stored_benchmark)
-                            except ValueError:
-                                default_idx = 0  # Fall back to first option
-                            
-                            selected_benchmark = st.selectbox(
-                                "Select Benchmark Index", 
-                                benchmark_options,
-                                index=default_idx,
-                                key="benchmark_selector"
-                            )
-                            st.session_state['benchmark_selection'] = selected_benchmark
-                            
-                            # Auto-load benchmark data (uses cached session_state engine)
-                            try:
-                                import yfinance as yf
-                                benchmark_ticker = yahoo_index_map.get(selected_benchmark, "^NSEI")
-                                
-                                # Use stored dates from session_state if available
-                                bt_start = st.session_state.get('backtest_start_date', start_date)
-                                bt_end = st.session_state.get('backtest_end_date', end_date)
-                                
-                                benchmark_data = yf.download(benchmark_ticker, start=bt_start, end=bt_end, progress=False)
-                                
-                                if not benchmark_data.empty:
-                                    # Calculate normalized returns (percentage from start)
-                                    portfolio_values = engine.portfolio_df['Portfolio Value']
-                                    portfolio_norm = (portfolio_values / portfolio_values.iloc[0] - 1) * 100
-                                    
-                                    benchmark_close = benchmark_data['Close']
-                                    if isinstance(benchmark_close, pd.DataFrame):
-                                        benchmark_close = benchmark_close.iloc[:, 0]
-                                    benchmark_norm = (benchmark_close / benchmark_close.iloc[0] - 1) * 100
-                                    
-                                    # Calculate drawdowns
-                                    portfolio_cummax = portfolio_values.cummax()
-                                    portfolio_dd = ((portfolio_values - portfolio_cummax) / portfolio_cummax) * 100
-                                    
-                                    benchmark_cummax = benchmark_close.cummax()
-                                    benchmark_dd = ((benchmark_close - benchmark_cummax) / benchmark_cummax) * 100
-                                    
-                                    # PnL Comparison Chart
-                                    fig_pnl = go.Figure()
-                                    fig_pnl.add_trace(go.Scatter(
-                                        x=portfolio_norm.index, y=portfolio_norm,
-                                        name="Portfolio", line=dict(color="#28a745", width=2)
-                                    ))
-                                    fig_pnl.add_trace(go.Scatter(
-                                        x=benchmark_norm.index, y=benchmark_norm,
-                                        name=selected_benchmark, line=dict(color="#007bff", width=2)
-                                    ))
-                                    fig_pnl.update_layout(
-                                        title=f"Cumulative Returns: Portfolio vs {selected_benchmark}",
-                                        xaxis_title="Date", yaxis_title="Return (%)",
-                                        height=400, template="plotly_dark",
-                                        legend=dict(orientation="h", yanchor="bottom", y=1.02)
-                                    )
-                                    st.plotly_chart(fig_pnl, use_container_width=True)
-                                    
-                                    # Drawdown Comparison Chart
-                                    fig_dd = go.Figure()
-                                    fig_dd.add_trace(go.Scatter(
-                                        x=portfolio_dd.index, y=portfolio_dd,
-                                        name="Portfolio DD", line=dict(color="#28a745", width=2),
-                                        fill='tozeroy', fillcolor='rgba(40, 167, 69, 0.2)'
-                                    ))
-                                    fig_dd.add_trace(go.Scatter(
-                                        x=benchmark_dd.index, y=benchmark_dd,
-                                        name=f"{selected_benchmark} DD", line=dict(color="#007bff", width=2),
-                                        fill='tozeroy', fillcolor='rgba(0, 123, 255, 0.2)'
-                                    ))
-                                    fig_dd.update_layout(
-                                        title=f"Drawdown Comparison: Portfolio vs {selected_benchmark}",
-                                        xaxis_title="Date", yaxis_title="Drawdown (%)",
-                                        height=400, template="plotly_dark",
-                                        legend=dict(orientation="h", yanchor="bottom", y=1.02)
-                                    )
-                                    st.plotly_chart(fig_dd, use_container_width=True)
-                                    
-                                    # Summary Metrics
-                                    st.markdown("---")
-                                    st.markdown("**📊 Comparison Summary**")
-                                    sum_col1, sum_col2, sum_col3, sum_col4 = st.columns(4)
-                                    
-                                    portfolio_return = portfolio_norm.iloc[-1]
-                                    benchmark_return = benchmark_norm.iloc[-1]
-                                    portfolio_max_dd = portfolio_dd.min()
-                                    benchmark_max_dd = benchmark_dd.min()
-                                    
-                                    sum_col1.metric("Portfolio Return", f"{portfolio_return:.1f}%")
-                                    sum_col2.metric(f"{selected_benchmark} Return", f"{benchmark_return:.1f}%")
-                                    sum_col3.metric("Portfolio Max DD", f"{portfolio_max_dd:.1f}%")
-                                    sum_col4.metric(f"{selected_benchmark} Max DD", f"{benchmark_max_dd:.1f}%")
-                                    
-                                    # Alpha calculation
-                                    alpha = portfolio_return - benchmark_return
-                                    if alpha > 0:
-                                        st.success(f"🎯 **Alpha Generated: +{alpha:.1f}%** (Portfolio outperformed {selected_benchmark})")
-                                    else:
-                                        st.warning(f"📉 **Alpha: {alpha:.1f}%** (Portfolio underperformed {selected_benchmark})")
-                                else:
-                                    st.warning(f"Could not fetch data for {selected_benchmark}.")
-                            except Exception as e:
-                                st.error(f"Error loading benchmark data: {e}")
                     else:
                         st.warning("No trades generated")
                 else:
                     st.error("Data fetch failed")
+    
+    # STANDALONE BENCHMARK COMPARISON - Persists across reruns using session_state
+    if st.session_state.get('current_backtest_active') and 'current_backtest' in st.session_state:
+        st.markdown("---")
+        st.subheader("📊 Benchmark Comparison")
+        
+        stored_data = st.session_state['current_backtest']
+        stored_engine = stored_data['engine']
+        bt_start = stored_data['start_date']
+        bt_end = stored_data['end_date']
+        
+        # Yahoo Finance index mappings
+        yahoo_index_map = {
+            "NIFTY 50": "^NSEI",
+            "NIFTY 100": "^CNX100", 
+            "NIFTY 500": "^CRSLDX",
+            "NIFTY BANK": "^NSEBANK",
+            "NIFTY IT": "^CNXIT",
+            "NIFTY MIDCAP 100": "^CNXMDCP",
+            "NIFTY SMLCAP 100": "^CNXSMLCAP",
+            "NIFTY NEXT 50": "^NSMIDCP",
+            "NIFTY FIN SERVICE": "^CNXFIN",
+        }
+        
+        benchmark_options = list(yahoo_index_map.keys())
+        
+        # Get stored selection or default
+        stored_benchmark = st.session_state.get('benchmark_selection', 'NIFTY 50')
+        try:
+            default_idx = benchmark_options.index(stored_benchmark)
+        except ValueError:
+            default_idx = 0
+        
+        selected_benchmark = st.selectbox(
+            "Select Benchmark Index", 
+            benchmark_options,
+            index=default_idx,
+            key="standalone_benchmark_selector"
+        )
+        st.session_state['benchmark_selection'] = selected_benchmark
+        
+        try:
+            import yfinance as yf
+            benchmark_ticker = yahoo_index_map.get(selected_benchmark, "^NSEI")
+            benchmark_data = yf.download(benchmark_ticker, start=bt_start, end=bt_end, progress=False)
+            
+            if not benchmark_data.empty:
+                portfolio_values = stored_engine.portfolio_df['Portfolio Value']
+                portfolio_norm = (portfolio_values / portfolio_values.iloc[0] - 1) * 100
+                
+                benchmark_close = benchmark_data['Close']
+                if isinstance(benchmark_close, pd.DataFrame):
+                    benchmark_close = benchmark_close.iloc[:, 0]
+                benchmark_norm = (benchmark_close / benchmark_close.iloc[0] - 1) * 100
+                
+                # Calculate drawdowns
+                portfolio_cummax = portfolio_values.cummax()
+                portfolio_dd = ((portfolio_values - portfolio_cummax) / portfolio_cummax) * 100
+                benchmark_cummax = benchmark_close.cummax()
+                benchmark_dd = ((benchmark_close - benchmark_cummax) / benchmark_cummax) * 100
+                
+                # PnL Comparison Chart
+                fig_pnl = go.Figure()
+                fig_pnl.add_trace(go.Scatter(x=portfolio_norm.index, y=portfolio_norm, name="Portfolio", line=dict(color="#28a745", width=2)))
+                fig_pnl.add_trace(go.Scatter(x=benchmark_norm.index, y=benchmark_norm, name=selected_benchmark, line=dict(color="#007bff", width=2)))
+                fig_pnl.update_layout(title=f"Cumulative Returns: Portfolio vs {selected_benchmark}", xaxis_title="Date", yaxis_title="Return (%)", height=400, template="plotly_dark")
+                st.plotly_chart(fig_pnl, use_container_width=True)
+                
+                # Drawdown Comparison
+                fig_dd = go.Figure()
+                fig_dd.add_trace(go.Scatter(x=portfolio_dd.index, y=portfolio_dd, name="Portfolio DD", line=dict(color="#28a745", width=2), fill='tozeroy', fillcolor='rgba(40, 167, 69, 0.2)'))
+                fig_dd.add_trace(go.Scatter(x=benchmark_dd.index, y=benchmark_dd, name=f"{selected_benchmark} DD", line=dict(color="#007bff", width=2), fill='tozeroy', fillcolor='rgba(0, 123, 255, 0.2)'))
+                fig_dd.update_layout(title=f"Drawdown Comparison", xaxis_title="Date", yaxis_title="Drawdown (%)", height=400, template="plotly_dark")
+                st.plotly_chart(fig_dd, use_container_width=True)
+                
+                # Summary
+                col1, col2, col3, col4 = st.columns(4)
+                col1.metric("Portfolio Return", f"{portfolio_norm.iloc[-1]:.1f}%")
+                col2.metric(f"{selected_benchmark} Return", f"{benchmark_norm.iloc[-1]:.1f}%")
+                col3.metric("Portfolio Max DD", f"{portfolio_dd.min():.1f}%")
+                col4.metric(f"{selected_benchmark} Max DD", f"{benchmark_dd.min():.1f}%")
+                
+                alpha = portfolio_norm.iloc[-1] - benchmark_norm.iloc[-1]
+                if alpha > 0:
+                    st.success(f"🎯 **Alpha Generated: +{alpha:.1f}%**")
+                else:
+                    st.warning(f"📉 **Alpha: {alpha:.1f}%**")
+            else:
+                st.warning(f"Could not fetch data for {selected_benchmark}")
+        except Exception as e:
+            st.error(f"Error loading benchmark: {e}")
 
 # ==================== TAB 2: BACKTEST LOGS ====================
 with main_tabs[1]:
