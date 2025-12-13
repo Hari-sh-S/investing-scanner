@@ -29,6 +29,11 @@ class DataCache:
             df = pd.read_parquet(cache_path)
             # Fix MultiIndex columns from old cache format
             if isinstance(df.columns, pd.MultiIndex):
+                print(f"[CACHE FIX] {ticker}: Converting MultiIndex columns")
+                df.columns = [col[0] if isinstance(col, tuple) else col for col in df.columns]
+            # Also check for tuple-like strings in column names
+            elif len(df.columns) > 0 and isinstance(df.columns[0], tuple):
+                print(f"[CACHE FIX] {ticker}: Converting tuple columns")
                 df.columns = [col[0] if isinstance(col, tuple) else col for col in df.columns]
             return df
         except Exception as e:
@@ -289,8 +294,10 @@ class PortfolioEngine:
                         # Clean data - remove duplicate indices and fix anomalies
                         cached_data = clean_dataframe(cached_data, ticker)
 
-                        # Filter to date range
-                        mask = (cached_data.index >= pd.Timestamp(self.start_date)) & \
+                        # Include 300 days BEFORE start_date for indicator lookback
+                        # 6-month performance needs ~130 days, 1-year needs ~260 days
+                        extended_start = pd.Timestamp(self.start_date) - pd.Timedelta(days=300)
+                        mask = (cached_data.index >= extended_start) & \
                                (cached_data.index <= pd.Timestamp(self.end_date))
                         df_filtered = cached_data[mask].copy()
                         
@@ -330,7 +337,9 @@ class PortfolioEngine:
                             # Clean data
                             cached_data = clean_dataframe(cached_data, ticker)
 
-                            mask = (cached_data.index >= pd.Timestamp(self.start_date)) & \
+                            # Include 300 days BEFORE start_date for indicator lookback
+                            extended_start = pd.Timestamp(self.start_date) - pd.Timedelta(days=300)
+                            mask = (cached_data.index >= extended_start) & \
                                    (cached_data.index <= pd.Timestamp(self.end_date))
                             df_filtered = cached_data[mask].copy()
                             
@@ -360,13 +369,24 @@ class PortfolioEngine:
         for ticker in self.data:
             try:
                 df = self.data[ticker]
+                
+                # Flatten columns first if needed (fix for cloud cache issues)
+                if isinstance(df.columns, pd.MultiIndex):
+                    df.columns = [col[0] if isinstance(col, tuple) else col for col in df.columns]
+                elif len(df.columns) > 0 and isinstance(df.columns[0], tuple):
+                    df.columns = [col[0] if isinstance(col, tuple) else col for col in df.columns]
+                
                 # Only calculate if not already calculated
                 if needs_momentum and '6 Month Performance' not in df.columns:
                     df = IndicatorLibrary.add_momentum_volatility_metrics(df)
-                    self.data[ticker] = df
                 if needs_regime and 'EMA_200' not in df.columns:
                     df = IndicatorLibrary.add_regime_filters(df)
-                    self.data[ticker] = df
+                
+                # Flatten again after indicators (some libraries create MultiIndex)
+                if isinstance(df.columns, pd.MultiIndex):
+                    df.columns = [col[0] if isinstance(col, tuple) else col for col in df.columns]
+                
+                self.data[ticker] = df
             except Exception as e:
                 print(f"Error calculating indicators for {ticker}: {e}")
 
