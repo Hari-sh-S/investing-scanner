@@ -670,17 +670,49 @@ with main_tabs[0]:
         bt_start = stored_data['start_date']
         bt_end = stored_data['end_date']
         
-        # Yahoo Finance index mappings
+        # Yahoo Finance index mappings - extensive list of available NSE indices
         yahoo_index_map = {
+            # Major Indices
             "NIFTY 50": "^NSEI",
-            "NIFTY 100": "^CNX100", 
+            "NIFTY NEXT 50": "^NSMIDCP",
+            "NIFTY 100": "^CNX100",
+            "NIFTY 200": "^CNX200",
             "NIFTY 500": "^CRSLDX",
             "NIFTY BANK": "^NSEBANK",
-            "NIFTY IT": "^CNXIT",
-            "NIFTY MIDCAP 100": "^CNXMDCP",
-            "NIFTY SMLCAP 100": "^CNXSMLCAP",
-            "NIFTY NEXT 50": "^NSMIDCP",
             "NIFTY FIN SERVICE": "^CNXFIN",
+            "NIFTY IT": "^CNXIT",
+            # Midcap & Smallcap
+            "NIFTY MIDCAP 50": "^NIFTYMIDCAP50",
+            "NIFTY MIDCAP 100": "^CNXMDCP",
+            "NIFTY SMLCAP 50": "^NSMALLCAP50",
+            "NIFTY SMLCAP 100": "^CNXSC",
+            "NIFTY SMLCAP 250": "^NSMALLCAP250",
+            # Sectoral
+            "NIFTY AUTO": "^CNXAUTO",
+            "NIFTY PHARMA": "^CNXPHARMA",
+            "NIFTY PSE": "^CNXPSE",
+            "NIFTY REALTY": "^CNXREALTY",
+            "NIFTY INFRA": "^CNXINFRA",
+            "NIFTY ENERGY": "^CNXENERGY",
+            "NIFTY FMCG": "^CNXFMCG",
+            "NIFTY METAL": "^CNXMETAL",
+            "NIFTY COMMODITIES": "^CNXCMDT",
+            "NIFTY CONSUMPTION": "^CNXCONSUMD",
+            "NIFTY CPSE": "^CNXCPSE",
+            "NIFTY MEDIA": "^CNXMEDIA",
+            "NIFTY PRIVATE BANK": "^NIFTYPVTBANK",
+            "NIFTY PSU BANK": "^CNXPSUBANK",
+            # Thematic
+            "NIFTY MNC": "^CNXMNC",
+            "NIFTY SERV SECTOR": "^CNXSERVICE",
+            "NIFTY GROWSECT 15": "^NIFTYGROWSECT15",
+            "NIFTY100 QUALITY 30": "^NIFTYQUALLV30",
+            "NIFTY50 VALUE 20": "^NIFTY50VALUE20",
+            "NIFTY DIVIDEND OPPS 50": "^CNXDIVIDEND",
+            # Strategy
+            "NIFTY ALPHA 50": "^NIFTYALPHA50",
+            "NIFTY HIGH BETA 50": "^NIFTYHIGHBETA50",
+            "NIFTY LOW VOLATILITY 50": "^NIFTYLOWVOL50",
         }
         
         benchmark_options = list(yahoo_index_map.keys())
