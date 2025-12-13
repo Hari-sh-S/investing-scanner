@@ -238,7 +238,7 @@ class PortfolioEngine:
         print(f"Loading data for {len(self.universe)} stocks...")
         tickers_to_download = []
 
-        def clean_dataframe(df):
+        def clean_dataframe(df, ticker_name="unknown"):
             """Remove duplicates, detect anomalies, and ensure clean data."""
             try:
                 if df is None or df.empty:
@@ -249,21 +249,16 @@ class PortfolioEngine:
                 # Sort by date
                 df = df.sort_index()
                 
-                # DATA QUALITY: Detect and fix extreme single-day price changes (>50%)
-                # These are almost always data errors from yfinance
+                # DATA QUALITY: Detect extreme single-day price changes (>50%)
+                # Just warn, don't fix
                 if 'Close' in df.columns and len(df) > 3:
-                    close = df['Close'].copy()
+                    close = df['Close']
                     pct_change = close.pct_change().abs()
-                    # Mark days with >50% change that recover next day as bad data
                     for i in range(1, len(pct_change) - 1):
                         if pct_change.iloc[i] > 0.5:  # >50% change
                             next_change = pct_change.iloc[i + 1] if i + 1 < len(pct_change) else 0
                             if next_change > 0.3:  # If it reverses next day
-                                # Interpolate the bad price
-                                df.iloc[i, df.columns.get_loc('Close')] = (
-                                    close.iloc[i - 1] + close.iloc[i + 1]
-                                ) / 2
-                                print(f"Fixed anomaly: {df.index[i]}")
+                                print(f"⚠️ DATA ANOMALY: {ticker_name} on {df.index[i].date()} - {pct_change.iloc[i]*100:.1f}% drop, then {next_change*100:.1f}% recovery")
                 
                 return df
             except Exception:
@@ -287,8 +282,8 @@ class PortfolioEngine:
                         if not isinstance(cached_data.index, pd.DatetimeIndex):
                             cached_data.index = pd.to_datetime(cached_data.index)
 
-                        # Clean data - remove duplicate indices
-                        cached_data = clean_dataframe(cached_data)
+                        # Clean data - remove duplicate indices and fix anomalies
+                        cached_data = clean_dataframe(cached_data, ticker)
 
                         # Filter to date range
                         mask = (cached_data.index >= pd.Timestamp(self.start_date)) & \
@@ -325,7 +320,7 @@ class PortfolioEngine:
                                 cached_data.index = pd.to_datetime(cached_data.index)
 
                             # Clean data
-                            cached_data = clean_dataframe(cached_data)
+                            cached_data = clean_dataframe(cached_data, ticker)
 
                             mask = (cached_data.index >= pd.Timestamp(self.start_date)) & \
                                    (cached_data.index <= pd.Timestamp(self.end_date))
