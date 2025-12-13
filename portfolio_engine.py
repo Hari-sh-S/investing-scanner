@@ -289,6 +289,10 @@ class PortfolioEngine:
                         mask = (cached_data.index >= pd.Timestamp(self.start_date)) & \
                                (cached_data.index <= pd.Timestamp(self.end_date))
                         df_filtered = cached_data[mask].copy()
+                        
+                        # Flatten MultiIndex columns if present
+                        if isinstance(df_filtered.columns, pd.MultiIndex):
+                            df_filtered.columns = [col[0] if isinstance(col, tuple) else col for col in df_filtered.columns]
 
                         if not df_filtered.empty and len(df_filtered) >= 100:
                             self.data[ticker] = df_filtered
@@ -325,6 +329,10 @@ class PortfolioEngine:
                             mask = (cached_data.index >= pd.Timestamp(self.start_date)) & \
                                    (cached_data.index <= pd.Timestamp(self.end_date))
                             df_filtered = cached_data[mask].copy()
+                            
+                            # Flatten MultiIndex columns if present
+                            if isinstance(df_filtered.columns, pd.MultiIndex):
+                                df_filtered.columns = [col[0] if isinstance(col, tuple) else col for col in df_filtered.columns]
 
                             if not df_filtered.empty:
                                 self.data[ticker] = df_filtered
@@ -714,6 +722,12 @@ class PortfolioEngine:
                 
                 # Rank stocks
                 ranked_stocks = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+                
+                # Debug: Log scoring results
+                if len(scores) == 0:
+                    print(f"   [WARN] No stocks scored on {date.date()} - check indicator columns")
+                elif len(ranked_stocks) < num_stocks:
+                    print(f"   [WARN] Only {len(ranked_stocks)} stocks scored (need {num_stocks}) on {date.date()}")
                 
                 # Select top N stocks
                 top_stocks = ranked_stocks[:num_stocks]
