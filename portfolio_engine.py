@@ -601,6 +601,7 @@ class PortfolioEngine:
         regime_active = False
         regime_cash_reserve = 0
         realized_pnl_running = 0
+        last_known_prices = {}  # Track last known prices for holdings (for data gaps)
         
         for date in all_dates:
             is_rebalance = date in rebalance_dates
@@ -683,6 +684,9 @@ class PortfolioEngine:
                                 unc_df.reset_index(inplace=True)
                                 unc_df['Date'] = pd.to_datetime(unc_df['Date'])
                                 unc_df.set_index('Date', inplace=True)
+                                # Reindex to all trading dates and forward-fill gaps (e.g. Oct 24 GOLDBEES)
+                                # Use ffill then bfill to handle gaps at start and middle
+                                unc_df = unc_df.reindex(all_dates).ffill().bfill()
                                 self.data[uncorrelated_asset] = unc_df
                         except Exception as e:
                             print(f"Could not download {uncorrelated_asset}: {e}")
@@ -781,11 +785,17 @@ class PortfolioEngine:
                             })
             
             
-            # Calculate portfolio value
+            # Calculate portfolio value - use last known price if current data missing
             holdings_value = 0.0
             for ticker, shares in holdings.items():
-                if ticker in self.data and date in self.data[ticker].index:
-                    close_price = self._get_scalar(self.data[ticker].loc[date, 'Close'])
+                if ticker in self.data:
+                    if date in self.data[ticker].index:
+                        close_price = self._get_scalar(self.data[ticker].loc[date, 'Close'])
+                        last_known_prices[ticker] = close_price  # Track last price
+                    elif ticker in last_known_prices:
+                        close_price = last_known_prices[ticker]  # Use last known
+                    else:
+                        continue  # No price available at all
                     holdings_value += shares * close_price
             
             total_value = cash + holdings_value
