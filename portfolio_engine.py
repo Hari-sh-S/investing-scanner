@@ -752,8 +752,9 @@ class PortfolioEngine:
                             'peak': peak_equity,
                             'current': recovery_equity
                         })
-                        # Update peak to current cash (we start fresh after recovery)
-                        peak_equity = cash
+                        # NOTE: We do NOT reset peak_equity here - keep tracking from original peak
+                        # This prevents compounded losses from whipsaw recovery-trigger cycles
+                        # Peak will only update when we make NEW highs (line 665-667)
                     else:
                         print(f"⏳ EQUITY REGIME STILL ACTIVE [{date.date()}]: Theoretical Drawdown={theoretical_drawdown:.2f}% > SL={equity_sl_pct}%")
                 
