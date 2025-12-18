@@ -617,7 +617,8 @@ class PortfolioEngine:
         last_known_prices = {}  # Track last known prices for holdings (for data gaps)
         
         # EQUITY regime filter tracking
-        peak_equity = self.initial_capital  # Track highest equity reached
+        peak_equity = self.initial_capital  # Track highest ACTUAL equity reached
+        theoretical_peak = self.initial_capital  # Track highest THEORETICAL equity reached (for recovery check)
         equity_regime_active = False  # True when drawdown exceeds threshold, waiting for recovery
         theoretical_history = []  # Track what would happen without EQUITY filter
         theoretical_holdings = {}  # Separate holdings for theoretical curve
@@ -660,6 +661,11 @@ class PortfolioEngine:
                             continue
                         theoretical_holdings_value += shares * cp
                 theoretical_equity = theoretical_cash + theoretical_holdings_value
+                
+                # Update theoretical peak (always track the highest theoretical value)
+                if theoretical_equity > theoretical_peak:
+                    theoretical_peak = theoretical_equity
+                
                 theoretical_history.append({
                     'Date': date,
                     'Theoretical_Equity': theoretical_equity,
@@ -738,31 +744,31 @@ class PortfolioEngine:
                 
                 # EQUITY REGIME: Check for recovery on rebalance day
                 if is_equity_regime and equity_regime_active:
-                    # Use THEORETICAL equity (what market would be worth) for recovery check
-                    # This allows recovery when the market has actually recovered, not just when cash value changes
-                    recovery_equity = theoretical_equity if theoretical_equity > 0 else current_equity
-                    theoretical_drawdown = ((peak_equity - recovery_equity) / peak_equity) * 100 if peak_equity > 0 else 0
+                    # Calculate THEORETICAL drawdown using theoretical equity's OWN peak
+                    # This gives proper 0-100% drawdown values
+                    theoretical_drawdown = ((theoretical_peak - theoretical_equity) / theoretical_peak) * 100 if theoretical_peak > 0 else 0
                     
                     # Use stricter recovery threshold (recovery_dd_pct) to avoid whipsaw
+                    # Recovery happens when theoretical portfolio recovers to within X% of its own peak
                     if theoretical_drawdown <= recovery_dd_pct:
-                        # RECOVERY: Market has recovered sufficiently - resume normal trading
+                        # RECOVERY: Market (theoretical) has recovered sufficiently - resume normal trading
                         print(f"🟢 EQUITY REGIME RECOVERED [{date.date()}]: Theoretical Drawdown={theoretical_drawdown:.2f}% <= Recovery Threshold={recovery_dd_pct}%")
                         print(f"   (Trigger was at {equity_sl_pct}%, Recovery requires <={recovery_dd_pct}%)")
-                        print(f"   Peak={peak_equity:.0f}, Theoretical Value={recovery_equity:.0f}, Cash={cash:.0f}")
+                        print(f"   Theoretical Peak={theoretical_peak:.0f}, Theoretical Current={theoretical_equity:.0f}")
+                        print(f"   Actual Cash={cash:.0f}")
                         equity_regime_active = False
                         regime_active = False
                         self.regime_trigger_events.append({
                             'date': date,
                             'type': 'recovery',
                             'drawdown': theoretical_drawdown,
-                            'peak': peak_equity,
-                            'current': recovery_equity
+                            'peak': theoretical_peak,  # Use theoretical peak for logging
+                            'current': theoretical_equity  # Use theoretical equity for logging
                         })
-                        # IMPORTANT: Reset peak to current cash value after recovery
+                        # IMPORTANT: Reset ACTUAL peak to current cash value after recovery
                         # This gives the portfolio a fresh baseline for the new cycle
-                        # Without this, we'd immediately re-trigger because actual cash < old peak
                         peak_equity = cash
-                        print(f"   Peak reset to cash: ₹{cash:.0f}")
+                        print(f"   Actual Peak reset to cash: ₹{cash:.0f}")
                     else:
                         print(f"⏳ EQUITY REGIME STILL ACTIVE [{date.date()}]: Theoretical Drawdown={theoretical_drawdown:.2f}% > Recovery Threshold={recovery_dd_pct}%")
                 
