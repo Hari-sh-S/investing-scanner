@@ -768,7 +768,17 @@ class PortfolioEngine:
 
                 
                 if regime_triggered:
-                    if regime_action == 'Go Cash':
+                    # For EQUITY regime: ALWAYS go 100% cash when triggered (drawdown protection)
+                    # For other regimes: respect the action setting
+                    if is_equity_regime:
+                        # EQUITY regime always goes 100% cash when triggered
+                        stocks_target = 0.0
+                        if uncorrelated_config:
+                            allocation_pct = uncorrelated_config['allocation_pct'] / 100.0
+                            uncorrelated_target = investable_capital * allocation_pct
+                        regime_active = True
+                        print(f"   EQUITY REGIME ACTIVE: 0% stocks (forced cash until recovery)")
+                    elif regime_action == 'Go Cash':
                         # 0% to stocks, uncorrelated gets its % from total, rest is cash
                         stocks_target = 0.0
                         if uncorrelated_config:
