@@ -225,18 +225,19 @@ with main_tabs[0]:
                                         ["1-1", "1-2", "1-2.5"])
                 regime_value = st_preset
             else:  # EQUITY
-                realized_sl = st.number_input("Realized PnL SL %", 1, 50, 10)
+                realized_sl = st.number_input("Drawdown SL %", 1, 50, 10,
+                                              help="Sell all holdings when drawdown from peak equity exceeds this %")
                 regime_value = realized_sl
             
-            # Regime action (only for non-EQUITY)
+            # Regime action - now available for ALL types including EQUITY
+            regime_action = st.selectbox("Regime Filter Action",
+                                        ["Go Cash", "Half Portfolio"],
+                                        help="Action to take when regime filter triggers")
+            
+            # Index selection for regime filter - only for non-EQUITY types
             if regime_type != "EQUITY":
-                regime_action = st.selectbox("Regime Filter Action",
-                                            ["Half Portfolio", "Go Cash"])
-
-                # Index selection for regime filter - use all available universes
                 regime_index = st.selectbox("Regime Filter Index", sorted(get_all_universe_names()))
             else:
-                regime_action = "Half Portfolio"  # Fixed for EQUITY
                 regime_index = None
             
             regime_config = {
@@ -655,6 +656,102 @@ with main_tabs[0]:
                                     st.info("No completed trades to display")
                             else:
                                 st.info("No trades executed")
+                        
+                        # Equity Regime Analysis Tab (only if EQUITY regime filter was used)
+                        equity_analysis = engine.get_equity_regime_analysis()
+                        if equity_analysis:
+                            # Add additional tab for EQUITY regime analysis
+                            with st.expander("📊 Equity Regime Analysis (Testing Only)", expanded=False):
+                                st.warning("⚠️ **DISCLAIMER**: This analysis section is for testing purposes only. The theoretical curve shows what would have happened WITHOUT the EQUITY regime filter.")
+                                
+                                st.markdown(f"**Stop-Loss Threshold:** {equity_analysis['sl_threshold']}%")
+                                
+                                # Trigger Events Table
+                                trigger_events = equity_analysis['trigger_events']
+                                if trigger_events:
+                                    st.markdown("### Regime Trigger Events")
+                                    events_data = []
+                                    for event in trigger_events:
+                                        events_data.append({
+                                            'Date': event['date'].strftime('%Y-%m-%d'),
+                                            'Event': '🔴 TRIGGERED' if event['type'] == 'trigger' else '🟢 RECOVERED',
+                                            'Drawdown %': f"{event['drawdown']:.2f}%",
+                                            'Peak Equity': f"₹{event['peak']:,.0f}",
+                                            'Current Equity': f"₹{event['current']:,.0f}"
+                                        })
+                                    st.dataframe(pd.DataFrame(events_data), use_container_width=True)
+                                
+                                # Peak Equity and Drawdown Chart
+                                st.markdown("### Peak Equity & Drawdown Tracking")
+                                fig_peak = go.Figure()
+                                fig_peak.add_trace(go.Scatter(
+                                    x=engine.portfolio_df.index,
+                                    y=engine.portfolio_df['Portfolio Value'],
+                                    name='Portfolio Value',
+                                    line=dict(color='#28a745', width=2)
+                                ))
+                                fig_peak.add_trace(go.Scatter(
+                                    x=engine.portfolio_df.index,
+                                    y=engine.portfolio_df['Peak_Equity'],
+                                    name='Peak Equity',
+                                    line=dict(color='#ffc107', width=2, dash='dot')
+                                ))
+                                # Add threshold line from peak
+                                threshold_line = engine.portfolio_df['Peak_Equity'] * (1 - equity_analysis['sl_threshold'] / 100)
+                                fig_peak.add_trace(go.Scatter(
+                                    x=engine.portfolio_df.index,
+                                    y=threshold_line,
+                                    name=f"SL Threshold ({equity_analysis['sl_threshold']}%)",
+                                    line=dict(color='#dc3545', width=1, dash='dash')
+                                ))
+                                
+                                # Add trigger event markers
+                                for event in trigger_events:
+                                    color = 'red' if event['type'] == 'trigger' else 'green'
+                                    symbol = 'triangle-down' if event['type'] == 'trigger' else 'triangle-up'
+                                    fig_peak.add_trace(go.Scatter(
+                                        x=[event['date']],
+                                        y=[event['current']],
+                                        mode='markers',
+                                        marker=dict(size=12, color=color, symbol=symbol),
+                                        name=f"{'Trigger' if event['type'] == 'trigger' else 'Recovery'} ({event['date'].strftime('%Y-%m-%d')})",
+                                        showlegend=True
+                                    ))
+                                
+                                fig_peak.update_layout(
+                                    title="Portfolio Value vs Peak Equity with SL Threshold",
+                                    xaxis_title="Date",
+                                    yaxis_title="Value (₹)",
+                                    height=450,
+                                    template='plotly_dark'
+                                )
+                                st.plotly_chart(fig_peak, use_container_width=True)
+                                
+                                # Drawdown percentage chart
+                                st.markdown("### Drawdown from Peak")
+                                fig_dd = go.Figure()
+                                fig_dd.add_trace(go.Scatter(
+                                    x=engine.portfolio_df.index,
+                                    y=-engine.portfolio_df['Drawdown_Pct'],  # Negative to show as positive area below
+                                    fill='tozeroy',
+                                    line=dict(color='#dc3545', width=1),
+                                    name='Drawdown %'
+                                ))
+                                # Add threshold line
+                                fig_dd.add_hline(
+                                    y=-equity_analysis['sl_threshold'], 
+                                    line_dash="dash", 
+                                    line_color="yellow",
+                                    annotation_text=f"SL Threshold ({equity_analysis['sl_threshold']}%)"
+                                )
+                                fig_dd.update_layout(
+                                    title="Drawdown % from Peak Equity",
+                                    xaxis_title="Date",
+                                    yaxis_title="Drawdown %",
+                                    height=350,
+                                    template='plotly_dark'
+                                )
+                                st.plotly_chart(fig_dd, use_container_width=True)
                     else:
                         st.warning("No trades generated")
                 else:

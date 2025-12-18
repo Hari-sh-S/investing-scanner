@@ -87,6 +87,9 @@ class PortfolioEngine:
         self.parser = ScoreParser()
         self.cache = DataCache() if use_cache else None
         self.regime_index_data = None
+        # EQUITY regime filter tracking
+        self.equity_regime_analysis = None  # Stores theoretical vs actual comparison data
+        self.regime_trigger_events = []  # List of {date, type: 'trigger'/'recovery', drawdown, peak}
 
     @staticmethod
     def _get_scalar(value):
@@ -453,29 +456,40 @@ class PortfolioEngine:
         print(f"Generated {len(rebalance_dates)} rebalance dates from {len(all_dates)} trading days")
         return sorted(rebalance_dates)
 
-    def _check_regime_filter(self, date, regime_config, realized_pnl=0):
-        """Check if regime filter is triggered on rebalance day."""
+    def _check_regime_filter(self, date, regime_config, current_equity=0, peak_equity=0):
+        """Check if regime filter is triggered.
+        
+        For EQUITY type: checks drawdown from peak equity
+        For other types: checks technical indicators on index
+        
+        Returns: (triggered: bool, action: str, drawdown_pct: float)
+        """
         if not regime_config:
-            return False, 'none'  # No filter active
+            return False, 'none', 0.0  # No filter active
         
         regime_type = regime_config['type']
         
         if regime_type == 'EQUITY':
-            # Check realized P&L
+            # Check drawdown from peak equity
             sl_pct = regime_config['value']
-            if realized_pnl < -sl_pct:
-                return True, regime_config['action']
-            return False, 'none'
+            if peak_equity > 0:
+                drawdown_pct = ((peak_equity - current_equity) / peak_equity) * 100
+            else:
+                drawdown_pct = 0.0
+            
+            if drawdown_pct > sl_pct:
+                return True, regime_config['action'], drawdown_pct
+            return False, 'none', drawdown_pct
         
         # For EMA, MACD, SUPERTREND - need index data
         if self.regime_index_data is None or self.regime_index_data.empty:
-            return False, 'none'
+            return False, 'none', 0.0
         
         # Use nearest available date if exact date not found (handles holidays)
         if date not in self.regime_index_data.index:
             nearest = self.regime_index_data.index.asof(date)
             if pd.isna(nearest):
-                return False, 'none'
+                return False, 'none', 0.0
             row = self.regime_index_data.loc[nearest]
         else:
             row = self.regime_index_data.loc[date]
@@ -497,7 +511,7 @@ class PortfolioEngine:
             
             # Triggered when index closes BELOW EMA
             if triggered:
-                return True, regime_config['action']
+                return True, regime_config['action'], 0.0
         
         elif regime_type == 'MACD':
             macd_val = get_scalar(row.get('MACD', 0))
@@ -505,7 +519,7 @@ class PortfolioEngine:
             triggered = macd_val < signal_val
             print(f"REGIME CHECK [{date}]: MACD={macd_val:.2f}, Signal={signal_val:.2f}, Triggered={triggered}")
             if triggered:
-                return True, regime_config['action']
+                return True, regime_config['action'], 0.0
         
         elif regime_type == 'SUPERTREND':
             # Use Supertrend_Direction column which has 'BUY' or 'SELL'
@@ -515,9 +529,9 @@ class PortfolioEngine:
             triggered = st_direction == 'SELL'
             print(f"REGIME CHECK [{date}]: SuperTrend Direction={st_direction}, Triggered={triggered}")
             if triggered:
-                return True, regime_config['action']
+                return True, regime_config['action'], 0.0
         
-        return False, 'none'
+        return False, 'none', 0.0
 
     def run_rebalance_strategy(self, scoring_formula, num_stocks, exit_rank, 
                               rebal_config, regime_config=None, uncorrelated_config=None, reinvest_profits=True):
@@ -600,15 +614,97 @@ class PortfolioEngine:
         portfolio_history = []
         regime_active = False
         regime_cash_reserve = 0
-        realized_pnl_running = 0
         last_known_prices = {}  # Track last known prices for holdings (for data gaps)
+        
+        # EQUITY regime filter tracking
+        peak_equity = self.initial_capital  # Track highest equity reached
+        equity_regime_active = False  # True when drawdown exceeds threshold, waiting for recovery
+        theoretical_history = []  # Track what would happen without EQUITY filter
+        theoretical_holdings = {}  # Separate holdings for theoretical curve
+        theoretical_cash = self.initial_capital
+        is_equity_regime = regime_config and regime_config['type'] == 'EQUITY'
+        equity_sl_pct = regime_config['value'] if is_equity_regime else 0
+        self.regime_trigger_events = []
         
         for date in all_dates:
             is_rebalance = date in rebalance_dates
             
+            # Calculate current equity value FIRST (before any trades)
+            current_holdings_value = 0.0
+            for ticker, shares in holdings.items():
+                if ticker in self.data:
+                    if date in self.data[ticker].index:
+                        cp = self._get_scalar(self.data[ticker].loc[date, 'Close'])
+                        last_known_prices[ticker] = cp
+                    elif ticker in last_known_prices:
+                        cp = last_known_prices[ticker]
+                    else:
+                        continue
+                    current_holdings_value += shares * cp
+            current_equity = cash + current_holdings_value
+            
+            # Track theoretical equity (without EQUITY regime filter)
+            if is_equity_regime:
+                theoretical_holdings_value = 0.0
+                for ticker, shares in theoretical_holdings.items():
+                    if ticker in self.data:
+                        if date in self.data[ticker].index:
+                            cp = self._get_scalar(self.data[ticker].loc[date, 'Close'])
+                        elif ticker in last_known_prices:
+                            cp = last_known_prices[ticker]
+                        else:
+                            continue
+                        theoretical_holdings_value += shares * cp
+                theoretical_equity = theoretical_cash + theoretical_holdings_value
+                theoretical_history.append({
+                    'Date': date,
+                    'Theoretical_Equity': theoretical_equity,
+                    'Theoretical_Holdings': theoretical_holdings_value
+                })
+            
+            # Update peak equity (only when not in equity regime active mode)
+            if not equity_regime_active and current_equity > peak_equity:
+                peak_equity = current_equity
+            
+            # EQUITY REGIME: Check for mid-day drawdown breach (on any day, not just rebalance)
+            if is_equity_regime and not equity_regime_active and holdings:
+                drawdown_pct = ((peak_equity - current_equity) / peak_equity) * 100 if peak_equity > 0 else 0
+                
+                if drawdown_pct > equity_sl_pct:
+                    # TRIGGER: Drawdown exceeded threshold - SELL ALL immediately
+                    print(f"🔴 EQUITY REGIME TRIGGERED [{date.date()}]: Drawdown={drawdown_pct:.2f}% > SL={equity_sl_pct}% (Peak={peak_equity:.0f}, Current={current_equity:.0f})")
+                    
+                    equity_regime_active = True
+                    self.regime_trigger_events.append({
+                        'date': date,
+                        'type': 'trigger',
+                        'drawdown': drawdown_pct,
+                        'peak': peak_equity,
+                        'current': current_equity
+                    })
+                    
+                    # Sell all holdings immediately (mid-day sell)
+                    for ticker, shares in list(holdings.items()):
+                        if ticker in self.data and date in self.data[ticker].index:
+                            sell_price = self._get_scalar(self.data[ticker].loc[date, 'Close'])
+                            proceeds = shares * sell_price
+                            cash += proceeds
+                            
+                            self.trades.append({
+                                'Date': date,
+                                'Ticker': ticker,
+                                'Action': 'SELL',
+                                'Shares': shares,
+                                'Price': sell_price,
+                                'Value': proceeds,
+                                'Reason': 'EQUITY_REGIME_TRIGGER'
+                            })
+                    holdings = {}
+                    regime_active = True
+            
             if is_rebalance:
-                # Sell all current holdings
-                for ticker, shares in holdings.items():
+                # Sell all current holdings (regular rebalance sell)
+                for ticker, shares in list(holdings.items()):
                     if ticker in self.data and date in self.data[ticker].index:
                         sell_price = self._get_scalar(self.data[ticker].loc[date, 'Close'])
                         proceeds = shares * sell_price
@@ -625,6 +721,9 @@ class PortfolioEngine:
                 
                 holdings = {}
                 
+                # Recalculate current equity after sells
+                current_equity = cash
+                
                 # Apply reinvest option
                 if reinvest_profits:
                     # Use all available cash (capital + profits)
@@ -633,14 +732,40 @@ class PortfolioEngine:
                     # Cap at initial capital only
                     investable_capital = min(float(cash), self.initial_capital)
                 
+                # EQUITY REGIME: Check for recovery on rebalance day
+                if is_equity_regime and equity_regime_active:
+                    # Recalculate drawdown from (frozen) peak
+                    drawdown_pct = ((peak_equity - current_equity) / peak_equity) * 100 if peak_equity > 0 else 0
+                    
+                    if drawdown_pct <= equity_sl_pct:
+                        # RECOVERY: Drawdown recovered - resume normal trading
+                        print(f"🟢 EQUITY REGIME RECOVERED [{date.date()}]: Drawdown={drawdown_pct:.2f}% <= SL={equity_sl_pct}%")
+                        equity_regime_active = False
+                        regime_active = False
+                        self.regime_trigger_events.append({
+                            'date': date,
+                            'type': 'recovery',
+                            'drawdown': drawdown_pct,
+                            'peak': peak_equity,
+                            'current': current_equity
+                        })
+                        # Update peak to current (reset after recovery)
+                        peak_equity = current_equity
+                    else:
+                        print(f"⏳ EQUITY REGIME STILL ACTIVE [{date.date()}]: Drawdown={drawdown_pct:.2f}% > SL={equity_sl_pct}%")
                 
-                
-                # Check regime filter ONLY on rebalance day
-                regime_triggered, regime_action = self._check_regime_filter(date, regime_config, realized_pnl_running)
+                # Check regime filter for non-EQUITY types, or use equity_regime_active for EQUITY type
+                if is_equity_regime:
+                    regime_triggered = equity_regime_active
+                    regime_action = regime_config['action'] if equity_regime_active else 'none'
+                    current_drawdown = ((peak_equity - current_equity) / peak_equity) * 100 if peak_equity > 0 else 0
+                else:
+                    regime_triggered, regime_action, current_drawdown = self._check_regime_filter(date, regime_config, current_equity, peak_equity)
                 
                 # Calculate allocations based on regime filter + uncorrelated interaction
                 stocks_target = 0.0
                 uncorrelated_target = 0.0
+
                 
                 if regime_triggered:
                     if regime_action == 'Go Cash':
@@ -783,6 +908,20 @@ class PortfolioEngine:
                                 'Score': score,
                                 'Rank': ranked_stocks.index((ticker, score)) + 1
                             })
+                # Update theoretical holdings (for EQUITY regime comparison)
+                # Theoretical curve assumes NO regime filter - always buys the same stocks
+                if is_equity_regime:
+                    # Reset theoretical holdings on rebalance
+                    theoretical_holdings = {}
+                    if top_stocks and investable_capital > 0:  # Note: uses full investable_capital, not available_for_stocks
+                        theo_position_value = theoretical_cash / max(1, len(top_stocks))
+                        for ticker, score in top_stocks:
+                            buy_price = self._get_scalar(self.data[ticker].loc[date, 'Close'])
+                            theo_shares = int(theo_position_value / buy_price)
+                            if theo_shares > 0:
+                                theoretical_holdings[ticker] = theo_shares
+                                theoretical_cash -= theo_shares * buy_price
+
             
             
             # Calculate portfolio value - use last known price if current data missing
@@ -799,18 +938,42 @@ class PortfolioEngine:
                     holdings_value += shares * close_price
             
             total_value = cash + holdings_value
+            
+            # Calculate current drawdown for tracking
+            current_dd = ((peak_equity - total_value) / peak_equity) * 100 if peak_equity > 0 else 0
+            
             portfolio_history.append({
                 'Date': date,
                 'Cash': cash,
                 'Holdings': holdings_value,
                 'Portfolio Value': total_value,
                 'Positions': len(holdings),
-                'Regime_Active': regime_active
+                'Regime_Active': regime_active,
+                'Peak_Equity': peak_equity,
+                'Drawdown_Pct': current_dd,
+                'Equity_Regime_Active': equity_regime_active if is_equity_regime else False
             })
         
         # Store results
         self.portfolio_df = pd.DataFrame(portfolio_history).set_index('Date')
         self.trades_df = pd.DataFrame(self.trades)
+        
+        # Store EQUITY regime analysis data
+        if is_equity_regime and theoretical_history:
+            self.equity_regime_analysis = {
+                'theoretical_curve': pd.DataFrame(theoretical_history).set_index('Date'),
+                'trigger_events': self.regime_trigger_events,
+                'sl_threshold': equity_sl_pct
+            }
+    
+    def get_equity_regime_analysis(self):
+        """Return EQUITY regime filter analysis data for visualization.
+        
+        Returns:
+            dict with 'theoretical_curve', 'trigger_events', 'sl_threshold'
+            or None if EQUITY filter was not used
+        """
+        return self.equity_regime_analysis
     
     def get_metrics(self):
         """Calculate comprehensive performance metrics."""
