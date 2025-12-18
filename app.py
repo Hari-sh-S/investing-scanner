@@ -224,9 +224,12 @@ with main_tabs[0]:
                 st_preset = st.selectbox("SuperTrend (Period-Multiplier)", 
                                         ["1-1", "1-2", "1-2.5"])
                 regime_value = st_preset
+                recovery_dd = None  # Not used for non-EQUITY types
             else:  # EQUITY
-                realized_sl = st.number_input("Drawdown SL %", 1, 50, 10,
+                realized_sl = st.number_input("Drawdown SL % (Trigger)", 1, 50, 10,
                                               help="Sell all holdings when drawdown from peak equity exceeds this %")
+                recovery_dd = st.number_input("Recovery DD % (Re-entry)", 0, 49, 5,
+                                              help="Only re-enter market when drawdown recovers below this %. Should be less than Trigger % to avoid whipsaw.")
                 regime_value = realized_sl
             
             # Regime action - now available for ALL types including EQUITY
@@ -244,7 +247,8 @@ with main_tabs[0]:
                 'type': regime_type,
                 'value': regime_value,
                 'action': regime_action,
-                'index': regime_index
+                'index': regime_index,
+                'recovery_dd': recovery_dd  # Recovery threshold for EQUITY regime
             }
             
             # Uncorrelated Asset - ONLY when regime filter is enabled

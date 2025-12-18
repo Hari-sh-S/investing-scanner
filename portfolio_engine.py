@@ -624,6 +624,10 @@ class PortfolioEngine:
         theoretical_cash = self.initial_capital
         is_equity_regime = regime_config and regime_config['type'] == 'EQUITY'
         equity_sl_pct = regime_config['value'] if is_equity_regime else 0
+        # Recovery threshold - defaults to same as trigger if not specified
+        recovery_dd_pct = regime_config.get('recovery_dd', equity_sl_pct) if is_equity_regime else 0
+        if recovery_dd_pct is None or recovery_dd_pct >= equity_sl_pct:
+            recovery_dd_pct = equity_sl_pct  # Fallback to same as trigger
         self.regime_trigger_events = []
         
         for date in all_dates:
@@ -739,9 +743,11 @@ class PortfolioEngine:
                     recovery_equity = theoretical_equity if theoretical_equity > 0 else current_equity
                     theoretical_drawdown = ((peak_equity - recovery_equity) / peak_equity) * 100 if peak_equity > 0 else 0
                     
-                    if theoretical_drawdown <= equity_sl_pct:
-                        # RECOVERY: Market has recovered - resume normal trading
-                        print(f"🟢 EQUITY REGIME RECOVERED [{date.date()}]: Theoretical Drawdown={theoretical_drawdown:.2f}% <= SL={equity_sl_pct}%")
+                    # Use stricter recovery threshold (recovery_dd_pct) to avoid whipsaw
+                    if theoretical_drawdown <= recovery_dd_pct:
+                        # RECOVERY: Market has recovered sufficiently - resume normal trading
+                        print(f"🟢 EQUITY REGIME RECOVERED [{date.date()}]: Theoretical Drawdown={theoretical_drawdown:.2f}% <= Recovery Threshold={recovery_dd_pct}%")
+                        print(f"   (Trigger was at {equity_sl_pct}%, Recovery requires <={recovery_dd_pct}%)")
                         print(f"   Peak={peak_equity:.0f}, Theoretical Value={recovery_equity:.0f}, Cash={cash:.0f}")
                         equity_regime_active = False
                         regime_active = False
@@ -756,7 +762,7 @@ class PortfolioEngine:
                         # This prevents compounded losses from whipsaw recovery-trigger cycles
                         # Peak will only update when we make NEW highs (line 665-667)
                     else:
-                        print(f"⏳ EQUITY REGIME STILL ACTIVE [{date.date()}]: Theoretical Drawdown={theoretical_drawdown:.2f}% > SL={equity_sl_pct}%")
+                        print(f"⏳ EQUITY REGIME STILL ACTIVE [{date.date()}]: Theoretical Drawdown={theoretical_drawdown:.2f}% > Recovery Threshold={recovery_dd_pct}%")
                 
                 # Check regime filter for non-EQUITY types, or use equity_regime_active for EQUITY type
                 if is_equity_regime:
