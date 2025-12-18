@@ -656,9 +656,12 @@ with main_tabs[0]:
                                     st.info("No completed trades to display")
                             else:
                                 st.info("No trades executed")
-                        
                         # Equity Regime Analysis Tab (only if EQUITY regime filter was used)
-                        equity_analysis = engine.get_equity_regime_analysis()
+                        # Use hasattr for backward compatibility with old session state engines
+                        equity_analysis = None
+                        if hasattr(engine, 'get_equity_regime_analysis'):
+                            equity_analysis = engine.get_equity_regime_analysis()
+                        
                         if equity_analysis:
                             # Add additional tab for EQUITY regime analysis
                             with st.expander("📊 Equity Regime Analysis (Testing Only)", expanded=False):
@@ -667,7 +670,7 @@ with main_tabs[0]:
                                 st.markdown(f"**Stop-Loss Threshold:** {equity_analysis['sl_threshold']}%")
                                 
                                 # Trigger Events Table
-                                trigger_events = equity_analysis['trigger_events']
+                                trigger_events = equity_analysis.get('trigger_events', [])
                                 if trigger_events:
                                     st.markdown("### Regime Trigger Events")
                                     events_data = []
@@ -680,78 +683,132 @@ with main_tabs[0]:
                                             'Current Equity': f"₹{event['current']:,.0f}"
                                         })
                                     st.dataframe(pd.DataFrame(events_data), use_container_width=True)
+                                else:
+                                    st.info("No regime triggers during this backtest period. The drawdown never exceeded your SL threshold.")
+                                
+                                # Theoretical vs Actual Equity Curve
+                                theoretical_curve = equity_analysis.get('theoretical_curve')
+                                if theoretical_curve is not None and not theoretical_curve.empty:
+                                    st.markdown("### Theoretical vs Actual Equity Curve")
+                                    st.caption("Shows what would have happened WITHOUT the EQUITY regime filter (no mid-drawdown exits)")
+                                    
+                                    fig_compare = go.Figure()
+                                    fig_compare.add_trace(go.Scatter(
+                                        x=engine.portfolio_df.index,
+                                        y=engine.portfolio_df['Portfolio Value'],
+                                        name='Actual (With EQUITY Filter)',
+                                        line=dict(color='#28a745', width=2)
+                                    ))
+                                    fig_compare.add_trace(go.Scatter(
+                                        x=theoretical_curve.index,
+                                        y=theoretical_curve['Theoretical_Equity'],
+                                        name='Theoretical (Without Filter)',
+                                        line=dict(color='#007bff', width=2, dash='dot')
+                                    ))
+                                    fig_compare.update_layout(
+                                        title="Actual vs Theoretical Equity Curve",
+                                        xaxis_title="Date",
+                                        yaxis_title="Portfolio Value (₹)",
+                                        height=450,
+                                        template='plotly_dark'
+                                    )
+                                    st.plotly_chart(fig_compare, use_container_width=True)
+                                    
+                                    # Summary metrics comparison
+                                    actual_final = engine.portfolio_df['Portfolio Value'].iloc[-1]
+                                    theoretical_final = theoretical_curve['Theoretical_Equity'].iloc[-1]
+                                    actual_return = ((actual_final / engine.initial_capital) - 1) * 100
+                                    theoretical_return = ((theoretical_final / engine.initial_capital) - 1) * 100
+                                    
+                                    comp_col1, comp_col2, comp_col3 = st.columns(3)
+                                    comp_col1.metric("Actual Final Value", f"₹{actual_final:,.0f}")
+                                    comp_col2.metric("Theoretical Final Value", f"₹{theoretical_final:,.0f}")
+                                    
+                                    diff = actual_return - theoretical_return
+                                    if diff > 0:
+                                        comp_col3.metric("Filter Benefit", f"+{diff:.2f}%", delta=f"+{diff:.2f}%")
+                                    else:
+                                        comp_col3.metric("Filter Impact", f"{diff:.2f}%", delta=f"{diff:.2f}%")
+                                
+                                st.markdown("---")
                                 
                                 # Peak Equity and Drawdown Chart
                                 st.markdown("### Peak Equity & Drawdown Tracking")
-                                fig_peak = go.Figure()
-                                fig_peak.add_trace(go.Scatter(
-                                    x=engine.portfolio_df.index,
-                                    y=engine.portfolio_df['Portfolio Value'],
-                                    name='Portfolio Value',
-                                    line=dict(color='#28a745', width=2)
-                                ))
-                                fig_peak.add_trace(go.Scatter(
-                                    x=engine.portfolio_df.index,
-                                    y=engine.portfolio_df['Peak_Equity'],
-                                    name='Peak Equity',
-                                    line=dict(color='#ffc107', width=2, dash='dot')
-                                ))
-                                # Add threshold line from peak
-                                threshold_line = engine.portfolio_df['Peak_Equity'] * (1 - equity_analysis['sl_threshold'] / 100)
-                                fig_peak.add_trace(go.Scatter(
-                                    x=engine.portfolio_df.index,
-                                    y=threshold_line,
-                                    name=f"SL Threshold ({equity_analysis['sl_threshold']}%)",
-                                    line=dict(color='#dc3545', width=1, dash='dash')
-                                ))
-                                
-                                # Add trigger event markers
-                                for event in trigger_events:
-                                    color = 'red' if event['type'] == 'trigger' else 'green'
-                                    symbol = 'triangle-down' if event['type'] == 'trigger' else 'triangle-up'
+                                if 'Peak_Equity' in engine.portfolio_df.columns:
+                                    fig_peak = go.Figure()
                                     fig_peak.add_trace(go.Scatter(
-                                        x=[event['date']],
-                                        y=[event['current']],
-                                        mode='markers',
-                                        marker=dict(size=12, color=color, symbol=symbol),
-                                        name=f"{'Trigger' if event['type'] == 'trigger' else 'Recovery'} ({event['date'].strftime('%Y-%m-%d')})",
-                                        showlegend=True
+                                        x=engine.portfolio_df.index,
+                                        y=engine.portfolio_df['Portfolio Value'],
+                                        name='Portfolio Value',
+                                        line=dict(color='#28a745', width=2)
                                     ))
-                                
-                                fig_peak.update_layout(
-                                    title="Portfolio Value vs Peak Equity with SL Threshold",
-                                    xaxis_title="Date",
-                                    yaxis_title="Value (₹)",
-                                    height=450,
-                                    template='plotly_dark'
-                                )
-                                st.plotly_chart(fig_peak, use_container_width=True)
+                                    fig_peak.add_trace(go.Scatter(
+                                        x=engine.portfolio_df.index,
+                                        y=engine.portfolio_df['Peak_Equity'],
+                                        name='Peak Equity',
+                                        line=dict(color='#ffc107', width=2, dash='dot')
+                                    ))
+                                    # Add threshold line from peak
+                                    threshold_line = engine.portfolio_df['Peak_Equity'] * (1 - equity_analysis['sl_threshold'] / 100)
+                                    fig_peak.add_trace(go.Scatter(
+                                        x=engine.portfolio_df.index,
+                                        y=threshold_line,
+                                        name=f"SL Threshold ({equity_analysis['sl_threshold']}%)",
+                                        line=dict(color='#dc3545', width=1, dash='dash')
+                                    ))
+                                    
+                                    # Add trigger event markers
+                                    for event in trigger_events:
+                                        color = 'red' if event['type'] == 'trigger' else 'green'
+                                        symbol = 'triangle-down' if event['type'] == 'trigger' else 'triangle-up'
+                                        fig_peak.add_trace(go.Scatter(
+                                            x=[event['date']],
+                                            y=[event['current']],
+                                            mode='markers',
+                                            marker=dict(size=12, color=color, symbol=symbol),
+                                            name=f"{'Trigger' if event['type'] == 'trigger' else 'Recovery'} ({event['date'].strftime('%Y-%m-%d')})",
+                                            showlegend=True
+                                        ))
+                                    
+                                    fig_peak.update_layout(
+                                        title="Portfolio Value vs Peak Equity with SL Threshold",
+                                        xaxis_title="Date",
+                                        yaxis_title="Value (₹)",
+                                        height=450,
+                                        template='plotly_dark'
+                                    )
+                                    st.plotly_chart(fig_peak, use_container_width=True)
                                 
                                 # Drawdown percentage chart
                                 st.markdown("### Drawdown from Peak")
-                                fig_dd = go.Figure()
-                                fig_dd.add_trace(go.Scatter(
-                                    x=engine.portfolio_df.index,
-                                    y=-engine.portfolio_df['Drawdown_Pct'],  # Negative to show as positive area below
-                                    fill='tozeroy',
-                                    line=dict(color='#dc3545', width=1),
-                                    name='Drawdown %'
-                                ))
-                                # Add threshold line
-                                fig_dd.add_hline(
-                                    y=-equity_analysis['sl_threshold'], 
-                                    line_dash="dash", 
-                                    line_color="yellow",
-                                    annotation_text=f"SL Threshold ({equity_analysis['sl_threshold']}%)"
-                                )
-                                fig_dd.update_layout(
-                                    title="Drawdown % from Peak Equity",
-                                    xaxis_title="Date",
-                                    yaxis_title="Drawdown %",
-                                    height=350,
-                                    template='plotly_dark'
-                                )
-                                st.plotly_chart(fig_dd, use_container_width=True)
+                                if 'Drawdown_Pct' in engine.portfolio_df.columns:
+                                    fig_dd = go.Figure()
+                                    fig_dd.add_trace(go.Scatter(
+                                        x=engine.portfolio_df.index,
+                                        y=-engine.portfolio_df['Drawdown_Pct'],  # Negative to show as positive area below
+                                        fill='tozeroy',
+                                        line=dict(color='#dc3545', width=1),
+                                        name='Drawdown %'
+                                    ))
+                                    # Add threshold line
+                                    fig_dd.add_hline(
+                                        y=-equity_analysis['sl_threshold'], 
+                                        line_dash="dash", 
+                                        line_color="yellow",
+                                        annotation_text=f"SL Threshold ({equity_analysis['sl_threshold']}%)"
+                                    )
+                                    fig_dd.update_layout(
+                                        title="Drawdown % from Peak Equity",
+                                        xaxis_title="Date",
+                                        yaxis_title="Drawdown %",
+                                        height=350,
+                                        template='plotly_dark'
+                                    )
+                                    st.plotly_chart(fig_dd, use_container_width=True)
+                                    
+                                    # Answer user's question in the UI
+                                    st.markdown("---")
+                                    st.info(f"**Note:** With EQUITY regime filter enabled at {equity_analysis['sl_threshold']}% SL, the maximum drawdown should be approximately capped at this threshold. When the drawdown breaches the SL, all positions are sold to prevent further losses.")
                     else:
                         st.warning("No trades generated")
                 else:
