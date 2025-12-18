@@ -734,25 +734,28 @@ class PortfolioEngine:
                 
                 # EQUITY REGIME: Check for recovery on rebalance day
                 if is_equity_regime and equity_regime_active:
-                    # Recalculate drawdown from (frozen) peak
-                    drawdown_pct = ((peak_equity - current_equity) / peak_equity) * 100 if peak_equity > 0 else 0
+                    # Use THEORETICAL equity (what market would be worth) for recovery check
+                    # This allows recovery when the market has actually recovered, not just when cash value changes
+                    recovery_equity = theoretical_equity if theoretical_equity > 0 else current_equity
+                    theoretical_drawdown = ((peak_equity - recovery_equity) / peak_equity) * 100 if peak_equity > 0 else 0
                     
-                    if drawdown_pct <= equity_sl_pct:
-                        # RECOVERY: Drawdown recovered - resume normal trading
-                        print(f"🟢 EQUITY REGIME RECOVERED [{date.date()}]: Drawdown={drawdown_pct:.2f}% <= SL={equity_sl_pct}%")
+                    if theoretical_drawdown <= equity_sl_pct:
+                        # RECOVERY: Market has recovered - resume normal trading
+                        print(f"🟢 EQUITY REGIME RECOVERED [{date.date()}]: Theoretical Drawdown={theoretical_drawdown:.2f}% <= SL={equity_sl_pct}%")
+                        print(f"   Peak={peak_equity:.0f}, Theoretical Value={recovery_equity:.0f}, Cash={cash:.0f}")
                         equity_regime_active = False
                         regime_active = False
                         self.regime_trigger_events.append({
                             'date': date,
                             'type': 'recovery',
-                            'drawdown': drawdown_pct,
+                            'drawdown': theoretical_drawdown,
                             'peak': peak_equity,
-                            'current': current_equity
+                            'current': recovery_equity
                         })
-                        # Update peak to current (reset after recovery)
-                        peak_equity = current_equity
+                        # Update peak to current cash (we start fresh after recovery)
+                        peak_equity = cash
                     else:
-                        print(f"⏳ EQUITY REGIME STILL ACTIVE [{date.date()}]: Drawdown={drawdown_pct:.2f}% > SL={equity_sl_pct}%")
+                        print(f"⏳ EQUITY REGIME STILL ACTIVE [{date.date()}]: Theoretical Drawdown={theoretical_drawdown:.2f}% > SL={equity_sl_pct}%")
                 
                 # Check regime filter for non-EQUITY types, or use equity_regime_active for EQUITY type
                 if is_equity_regime:
