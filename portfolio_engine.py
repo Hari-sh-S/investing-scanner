@@ -776,10 +776,10 @@ class PortfolioEngine:
                             'peak': theoretical_peak,  # Use theoretical peak for logging
                             'current': theoretical_equity  # Use theoretical equity for logging
                         })
-                        # IMPORTANT: Reset ACTUAL peak to current cash value after recovery
-                        # This gives the portfolio a fresh baseline for the new cycle
-                        peak_equity = cash
-                        print(f"   Actual Peak reset to cash: ₹{cash:.0f}")
+                        # NOTE: We do NOT reset peak_equity here
+                        # Peak only updates when actual equity makes NEW highs (line 687-688)
+                        # This ensures cummax drawdown never exceeds trigger threshold
+                        print(f"   Peak stays at: ₹{peak_equity:.0f} (will only update on new highs)")
                     else:
                         print(f"⏳ EQUITY REGIME STILL ACTIVE [{date.date()}]: Theoretical Drawdown={theoretical_drawdown:.2f}% > Recovery Threshold={recovery_dd_pct}%")
                 
