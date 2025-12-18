@@ -448,8 +448,17 @@ with main_tabs[0]:
                                 mime="application/pdf"
                             )
                         
-                        # Result tabs (Benchmark Comparison is now a standalone section below)
-                        result_tabs = st.tabs(["Performance Metrics", "Charts", "Monthly Breakup", "Monthly Report", "Trade History"])
+                        # Result tabs - add Equity Regime Testing tab if EQUITY filter is used
+                        equity_analysis = None
+                        if hasattr(engine, 'get_equity_regime_analysis'):
+                            equity_analysis = engine.get_equity_regime_analysis()
+                        
+                        # Build tab list dynamically
+                        tab_names = ["Performance Metrics", "Charts", "Monthly Breakup", "Monthly Report", "Trade History"]
+                        if equity_analysis:
+                            tab_names.append("Equity Regime Testing")
+                        
+                        result_tabs = st.tabs(tab_names)
                         
                         with result_tabs[0]:
                             st.markdown("### Key Performance Indicators")
@@ -656,16 +665,11 @@ with main_tabs[0]:
                                     st.info("No completed trades to display")
                             else:
                                 st.info("No trades executed")
-                        # Equity Regime Analysis Tab (only if EQUITY regime filter was used)
-                        # Use hasattr for backward compatibility with old session state engines
-                        equity_analysis = None
-                        if hasattr(engine, 'get_equity_regime_analysis'):
-                            equity_analysis = engine.get_equity_regime_analysis()
-                        
+                        # Equity Regime Testing Tab (only shown if EQUITY regime filter was used)
                         if equity_analysis:
-                            # Add additional tab for EQUITY regime analysis
-                            with st.expander("📊 Equity Regime Analysis (Testing Only)", expanded=False):
-                                st.warning("⚠️ **DISCLAIMER**: This analysis section is for testing purposes only. The theoretical curve shows what would have happened WITHOUT the EQUITY regime filter.")
+                            with result_tabs[5]:  # Last tab
+                                st.markdown("### 📊 Equity Regime Testing")
+                                st.warning("⚠️ **DISCLAIMER**: This section is for testing purposes only. The theoretical curve shows what would have happened WITHOUT the EQUITY regime filter.")
                                 
                                 st.markdown(f"**Stop-Loss Threshold:** {equity_analysis['sl_threshold']}%")
                                 

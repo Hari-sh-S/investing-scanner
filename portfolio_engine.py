@@ -909,11 +909,19 @@ class PortfolioEngine:
                                 'Rank': ranked_stocks.index((ticker, score)) + 1
                             })
                 # Update theoretical holdings (for EQUITY regime comparison)
-                # Theoretical curve assumes NO regime filter - always buys the same stocks
-                if is_equity_regime:
-                    # Reset theoretical holdings on rebalance
+                # Theoretical curve assumes NO regime filter - always trades normally
+                if is_equity_regime and is_rebalance:
+                    # First, SELL all theoretical holdings (same as actual rebalance does)
+                    for ticker, shares in theoretical_holdings.items():
+                        if ticker in self.data and date in self.data[ticker].index:
+                            sell_price = self._get_scalar(self.data[ticker].loc[date, 'Close'])
+                            theoretical_cash += shares * sell_price
+                    
+                    # Reset theoretical holdings
                     theoretical_holdings = {}
-                    if top_stocks and investable_capital > 0:  # Note: uses full investable_capital, not available_for_stocks
+                    
+                    # Buy top stocks with all theoretical cash (no regime filter reducing allocation)
+                    if top_stocks and theoretical_cash > 0:
                         theo_position_value = theoretical_cash / max(1, len(top_stocks))
                         for ticker, score in top_stocks:
                             buy_price = self._get_scalar(self.data[ticker].loc[date, 'Close'])
