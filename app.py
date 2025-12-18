@@ -910,6 +910,59 @@ with main_tabs[0]:
                                         stat_col2.metric("Days Below MA", f"{int(triggered_days):,}")
                                         stat_col3.metric("% Time in Reduced Exposure", f"{pct_triggered:.1f}%")
                                     
+                                    # Theoretical vs Actual Comparison
+                                    st.markdown("---")
+                                    st.markdown("### 📈 Theoretical vs Actual Equity Curve")
+                                    st.markdown("> Compare your actual returns (with MA filter) against theoretical returns (without filter)")
+                                    
+                                    # Get theoretical data from equity_analysis
+                                    if equity_analysis and 'theoretical_curve' in equity_analysis:
+                                        theoretical_df = equity_analysis['theoretical_curve']
+                                        
+                                        fig_compare = go.Figure()
+                                        
+                                        # Actual equity curve
+                                        fig_compare.add_trace(go.Scatter(
+                                            x=engine.portfolio_df.index,
+                                            y=engine.portfolio_df['Portfolio Value'],
+                                            name='Actual (With MA Filter)',
+                                            line=dict(color='#28a745', width=2)
+                                        ))
+                                        
+                                        # Theoretical equity curve
+                                        fig_compare.add_trace(go.Scatter(
+                                            x=theoretical_df.index,
+                                            y=theoretical_df['Theoretical_Equity'],
+                                            name='Theoretical (Without Filter)',
+                                            line=dict(color='#17a2b8', width=2, dash='dot')
+                                        ))
+                                        
+                                        fig_compare.update_layout(
+                                            title="Actual vs Theoretical Equity Curve",
+                                            xaxis_title="Date",
+                                            yaxis_title="Portfolio Value (₹)",
+                                            height=450,
+                                            template='plotly_dark',
+                                            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+                                        )
+                                        st.plotly_chart(fig_compare, use_container_width=True)
+                                        
+                                        # Summary metrics
+                                        actual_final = engine.portfolio_df['Portfolio Value'].iloc[-1]
+                                        theoretical_final = theoretical_df['Theoretical_Equity'].iloc[-1]
+                                        actual_return = ((actual_final / engine.initial_capital) - 1) * 100
+                                        theoretical_return = ((theoretical_final / engine.initial_capital) - 1) * 100
+                                        
+                                        comp_col1, comp_col2, comp_col3 = st.columns(3)
+                                        comp_col1.metric("Actual Final Value", f"₹{actual_final:,.0f}")
+                                        comp_col2.metric("Theoretical Final Value", f"₹{theoretical_final:,.0f}")
+                                        
+                                        diff = actual_return - theoretical_return
+                                        if diff > 0:
+                                            comp_col3.metric("Filter Benefit", f"+{diff:.2f}%", delta=f"+{diff:.2f}%")
+                                        else:
+                                            comp_col3.metric("Filter Impact", f"{diff:.2f}%", delta=f"{diff:.2f}%")
+                                    
                                     st.markdown("---")
                                     st.info(f"**How it works:** When portfolio equity falls below its {ma_period}-day moving average, exposure is reduced to protect capital. When equity recovers above the MA, full exposure resumes.")
                     else:

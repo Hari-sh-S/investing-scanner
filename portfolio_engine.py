@@ -659,8 +659,8 @@ class PortfolioEngine:
                     current_holdings_value += shares * cp
             current_equity = cash + current_holdings_value
             
-            # Track theoretical equity (without EQUITY regime filter)
-            if is_equity_regime:
+            # Track theoretical equity (without EQUITY or EQUITY_MA regime filter)
+            if is_equity_regime or is_equity_ma_regime:
                 theoretical_holdings_value = 0.0
                 for ticker, shares in theoretical_holdings.items():
                     if ticker in self.data:
@@ -959,9 +959,9 @@ class PortfolioEngine:
                                 'Score': score,
                                 'Rank': ranked_stocks.index((ticker, score)) + 1
                             })
-                # Update theoretical holdings (for EQUITY regime comparison)
+                # Update theoretical holdings (for EQUITY and EQUITY_MA regime comparison)
                 # Theoretical curve assumes NO regime filter - always trades normally
-                if is_equity_regime and is_rebalance:
+                if (is_equity_regime or is_equity_ma_regime) and is_rebalance:
                     # First, SELL all theoretical holdings (same as actual rebalance does)
                     for ticker, shares in theoretical_holdings.items():
                         if ticker in self.data and date in self.data[ticker].index:
@@ -1031,12 +1031,14 @@ class PortfolioEngine:
         self.portfolio_df = pd.DataFrame(portfolio_history).set_index('Date')
         self.trades_df = pd.DataFrame(self.trades)
         
-        # Store EQUITY regime analysis data
-        if is_equity_regime and theoretical_history:
+        # Store EQUITY or EQUITY_MA regime analysis data
+        if (is_equity_regime or is_equity_ma_regime) and theoretical_history:
             self.equity_regime_analysis = {
                 'theoretical_curve': pd.DataFrame(theoretical_history).set_index('Date'),
-                'trigger_events': self.regime_trigger_events,
-                'sl_threshold': equity_sl_pct
+                'trigger_events': self.regime_trigger_events if is_equity_regime else [],
+                'sl_threshold': equity_sl_pct if is_equity_regime else 0,
+                'is_equity_ma': is_equity_ma_regime,
+                'ma_period': equity_ma_period if is_equity_ma_regime else None
             }
     
     def get_equity_regime_analysis(self):
