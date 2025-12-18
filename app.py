@@ -211,7 +211,12 @@ with main_tabs[0]:
         regime_config = None
         if use_regime_filter:
             regime_type = st.selectbox("Regime Filter Type", 
-                                      ["EMA", "MACD", "SUPERTREND", "EQUITY"])
+                                      ["EMA", "MACD", "SUPERTREND", "EQUITY", "EQUITY_MA"],
+                                      help="EQUITY_MA: Uses moving average of your equity curve (meta-strategy)")
+            
+            # Initialize defaults
+            recovery_dd = None
+            ma_period = None
             
             if regime_type == "EMA":
                 ema_period = st.selectbox("EMA Period", [34, 68, 100, 150, 200])
@@ -224,21 +229,26 @@ with main_tabs[0]:
                 st_preset = st.selectbox("SuperTrend (Period-Multiplier)", 
                                         ["1-1", "1-2", "1-2.5"])
                 regime_value = st_preset
-                recovery_dd = None  # Not used for non-EQUITY types
-            else:  # EQUITY
+            elif regime_type == "EQUITY":
                 realized_sl = st.number_input("Drawdown SL % (Trigger)", 1, 50, 10,
                                               help="Sell all holdings when drawdown from peak equity exceeds this %")
                 recovery_dd = st.number_input("Recovery DD % (Re-entry)", 0, 49, 5,
                                               help="Only re-enter market when drawdown recovers below this %. Should be less than Trigger % to avoid whipsaw.")
                 regime_value = realized_sl
+            else:  # EQUITY_MA
+                ma_period = st.selectbox("Equity Curve MA Period (days)", 
+                                        [20, 30, 50, 100, 200],
+                                        index=2,  # Default to 50
+                                        help="Reduce exposure when portfolio equity falls below this MA")
+                regime_value = ma_period
             
             # Regime action - now available for ALL types including EQUITY
             regime_action = st.selectbox("Regime Filter Action",
                                         ["Go Cash", "Half Portfolio"],
                                         help="Action to take when regime filter triggers")
             
-            # Index selection for regime filter - only for non-EQUITY types
-            if regime_type != "EQUITY":
+            # Index selection for regime filter - only for non-EQUITY and non-EQUITY_MA types
+            if regime_type not in ["EQUITY", "EQUITY_MA"]:
                 regime_index = st.selectbox("Regime Filter Index", sorted(get_all_universe_names()))
             else:
                 regime_index = None
@@ -248,7 +258,8 @@ with main_tabs[0]:
                 'value': regime_value,
                 'action': regime_action,
                 'index': regime_index,
-                'recovery_dd': recovery_dd  # Recovery threshold for EQUITY regime
+                'recovery_dd': recovery_dd,  # Recovery threshold for EQUITY regime
+                'ma_period': ma_period if regime_type == "EQUITY_MA" else None  # MA period for EQUITY_MA
             }
             
             # Uncorrelated Asset - ONLY when regime filter is enabled

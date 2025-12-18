@@ -481,6 +481,11 @@ class PortfolioEngine:
                 return True, regime_config['action'], drawdown_pct
             return False, 'none', drawdown_pct
         
+        if regime_type == 'EQUITY_MA':
+            # EQUITY_MA is handled separately in the main loop
+            # This is just a placeholder - actual check done in run_rebalance_strategy
+            return False, 'none', 0.0
+        
         # For EMA, MACD, SUPERTREND - need index data
         if self.regime_index_data is None or self.regime_index_data.empty:
             return False, 'none', 0.0
@@ -631,6 +636,12 @@ class PortfolioEngine:
             recovery_dd_pct = equity_sl_pct  # Fallback to same as trigger
         self.regime_trigger_events = []
         
+        # EQUITY_MA regime filter tracking
+        is_equity_ma_regime = regime_config and regime_config['type'] == 'EQUITY_MA'
+        equity_ma_period = regime_config.get('ma_period', 50) if is_equity_ma_regime else 50
+        equity_history_for_ma = []  # List of recent equity values for MA calculation
+        equity_ma_triggered = False  # True when equity < MA
+        
         for date in all_dates:
             is_rebalance = date in rebalance_dates
             
@@ -777,6 +788,20 @@ class PortfolioEngine:
                     regime_triggered = equity_regime_active
                     regime_action = regime_config['action'] if equity_regime_active else 'none'
                     current_drawdown = ((peak_equity - current_equity) / peak_equity) * 100 if peak_equity > 0 else 0
+                elif is_equity_ma_regime:
+                    # EQUITY_MA: Check if current equity is below its moving average
+                    if len(equity_history_for_ma) >= equity_ma_period:
+                        equity_ma = sum(equity_history_for_ma[-equity_ma_period:]) / equity_ma_period
+                        equity_ma_triggered = current_equity < equity_ma
+                        if equity_ma_triggered:
+                            print(f"📉 EQUITY_MA TRIGGERED [{date.date()}]: Equity={current_equity:.0f} < MA{equity_ma_period}={equity_ma:.0f}")
+                        else:
+                            print(f"✅ EQUITY_MA OK [{date.date()}]: Equity={current_equity:.0f} >= MA{equity_ma_period}={equity_ma:.0f}")
+                    else:
+                        equity_ma_triggered = False  # Not enough data yet
+                    regime_triggered = equity_ma_triggered
+                    regime_action = regime_config['action'] if equity_ma_triggered else 'none'
+                    current_drawdown = 0.0
                 else:
                     regime_triggered, regime_action, current_drawdown = self._check_regime_filter(date, regime_config, current_equity, peak_equity)
                 
@@ -973,8 +998,20 @@ class PortfolioEngine:
             
             total_value = cash + holdings_value
             
+            # Update equity history for EQUITY_MA calculation
+            if is_equity_ma_regime:
+                equity_history_for_ma.append(total_value)
+                # Keep only the last 2x MA period to save memory
+                if len(equity_history_for_ma) > equity_ma_period * 2:
+                    equity_history_for_ma = equity_history_for_ma[-equity_ma_period * 2:]
+            
             # Calculate current drawdown for tracking
             current_dd = ((peak_equity - total_value) / peak_equity) * 100 if peak_equity > 0 else 0
+            
+            # Calculate equity MA for tracking
+            equity_ma_value = 0.0
+            if is_equity_ma_regime and len(equity_history_for_ma) >= equity_ma_period:
+                equity_ma_value = sum(equity_history_for_ma[-equity_ma_period:]) / equity_ma_period
             
             portfolio_history.append({
                 'Date': date,
@@ -985,7 +1022,9 @@ class PortfolioEngine:
                 'Regime_Active': regime_active,
                 'Peak_Equity': peak_equity,
                 'Drawdown_Pct': current_dd,
-                'Equity_Regime_Active': equity_regime_active if is_equity_regime else False
+                'Equity_Regime_Active': equity_regime_active if is_equity_regime else False,
+                'Equity_MA': equity_ma_value if is_equity_ma_regime else 0.0,
+                'Equity_MA_Triggered': equity_ma_triggered if is_equity_ma_regime else False
             })
         
         # Store results
