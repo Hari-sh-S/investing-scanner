@@ -468,10 +468,16 @@ with main_tabs[0]:
                         if hasattr(engine, 'get_equity_regime_analysis'):
                             equity_analysis = engine.get_equity_regime_analysis()
                         
+                        
                         # Build tab list dynamically
                         tab_names = ["Performance Metrics", "Charts", "Monthly Breakup", "Monthly Report", "Trade History"]
                         if equity_analysis:
                             tab_names.append("Equity Regime Testing")
+                        
+                        # Check if EQUITY_MA filter is used
+                        is_equity_ma = regime_config and regime_config.get('type') == 'EQUITY_MA'
+                        if is_equity_ma:
+                            tab_names.append("Equity MA Testing")
                         
                         result_tabs = st.tabs(tab_names)
                         
@@ -828,6 +834,84 @@ with main_tabs[0]:
                                     # Answer user's question in the UI
                                     st.markdown("---")
                                     st.info(f"**Note:** With EQUITY regime filter enabled at {equity_analysis['sl_threshold']}% SL, the maximum drawdown should be approximately capped at this threshold. When the drawdown breaches the SL, all positions are sold to prevent further losses.")
+                        
+                        # EQUITY_MA Testing Tab
+                        if is_equity_ma and len(tab_names) > 5:
+                            # Find the EQUITY_MA tab index
+                            equity_ma_tab_idx = len(tab_names) - 1  # Last tab
+                            if equity_analysis:
+                                equity_ma_tab_idx = len(tab_names) - 1  # Still last if both exist
+                            
+                            with result_tabs[equity_ma_tab_idx]:
+                                st.markdown("### 📈 Equity Curve MA Analysis")
+                                st.markdown("> **Meta-Strategy:** Reduce exposure when portfolio equity falls below its moving average")
+                                
+                                ma_period = regime_config.get('ma_period', 50)
+                                
+                                # Check if we have the MA data in portfolio_df
+                                if 'Equity_MA' in engine.portfolio_df.columns:
+                                    st.markdown("---")
+                                    
+                                    # Equity vs MA Chart
+                                    st.markdown(f"### Equity Curve vs {ma_period}-Day MA")
+                                    
+                                    fig_ma = go.Figure()
+                                    
+                                    # Portfolio Value
+                                    fig_ma.add_trace(go.Scatter(
+                                        x=engine.portfolio_df.index,
+                                        y=engine.portfolio_df['Portfolio Value'],
+                                        name='Portfolio Value',
+                                        line=dict(color='#28a745', width=2)
+                                    ))
+                                    
+                                    # MA line (filter out zeros)
+                                    ma_data = engine.portfolio_df[engine.portfolio_df['Equity_MA'] > 0]['Equity_MA']
+                                    fig_ma.add_trace(go.Scatter(
+                                        x=ma_data.index,
+                                        y=ma_data,
+                                        name=f'{ma_period}-Day MA',
+                                        line=dict(color='#ffc107', width=2, dash='dot')
+                                    ))
+                                    
+                                    # Shade triggered periods
+                                    if 'Equity_MA_Triggered' in engine.portfolio_df.columns:
+                                        triggered = engine.portfolio_df[engine.portfolio_df['Equity_MA_Triggered'] == True]
+                                        if len(triggered) > 0:
+                                            fig_ma.add_trace(go.Scatter(
+                                                x=triggered.index,
+                                                y=triggered['Portfolio Value'],
+                                                mode='markers',
+                                                name='Below MA (Reduced Exposure)',
+                                                marker=dict(color='#dc3545', size=4, opacity=0.6)
+                                            ))
+                                    
+                                    fig_ma.update_layout(
+                                        title=f"Portfolio Equity vs {ma_period}-Day Moving Average",
+                                        xaxis_title="Date",
+                                        yaxis_title="Value (₹)",
+                                        height=450,
+                                        template='plotly_dark',
+                                        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+                                    )
+                                    st.plotly_chart(fig_ma, use_container_width=True)
+                                    
+                                    # Statistics
+                                    st.markdown("---")
+                                    st.markdown("### 📊 MA Filter Statistics")
+                                    
+                                    if 'Equity_MA_Triggered' in engine.portfolio_df.columns:
+                                        total_days = len(engine.portfolio_df)
+                                        triggered_days = engine.portfolio_df['Equity_MA_Triggered'].sum()
+                                        pct_triggered = (triggered_days / total_days * 100) if total_days > 0 else 0
+                                        
+                                        stat_col1, stat_col2, stat_col3 = st.columns(3)
+                                        stat_col1.metric("Total Trading Days", f"{total_days:,}")
+                                        stat_col2.metric("Days Below MA", f"{int(triggered_days):,}")
+                                        stat_col3.metric("% Time in Reduced Exposure", f"{pct_triggered:.1f}%")
+                                    
+                                    st.markdown("---")
+                                    st.info(f"**How it works:** When portfolio equity falls below its {ma_period}-day moving average, exposure is reduced to protect capital. When equity recovers above the MA, full exposure resumes.")
                     else:
                         st.warning("No trades generated")
                 else:
