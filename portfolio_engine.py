@@ -539,9 +539,13 @@ class PortfolioEngine:
         return False, 'none', 0.0
 
     def run_rebalance_strategy(self, scoring_formula, num_stocks, exit_rank, 
-                              rebal_config, regime_config=None, uncorrelated_config=None, reinvest_profits=True):
+                              rebal_config, regime_config=None, uncorrelated_config=None, 
+                              reinvest_profits=True, position_sizing_config=None):
         """
         Advanced backtesting engine with all Sigma Scanner features.
+        
+        position_sizing_config: dict with 'method' (equal_weight, inverse_volatility, 
+                               score_weighted, risk_parity), 'use_cap' (bool), 'max_pct' (int)
         """
         if not self.data:
             print("No data available")
@@ -941,9 +945,99 @@ class PortfolioEngine:
                 
                 # Buy stocks with available_for_stocks amount
                 if top_stocks and available_for_stocks > 0:
-                    position_value = available_for_stocks / len(top_stocks)
+                    # Get position sizing config (default to equal weight)
+                    sizing_method = 'equal_weight'
+                    use_cap = False
+                    max_pct = 15
+                    if position_sizing_config:
+                        sizing_method = position_sizing_config.get('method', 'equal_weight')
+                        use_cap = position_sizing_config.get('use_cap', False)
+                        max_pct = position_sizing_config.get('max_pct', 15)
                     
+                    # Calculate weights based on method
+                    weights = {}
+                    
+                    if sizing_method == 'equal_weight':
+                        # Simple equal allocation
+                        for ticker, score in top_stocks:
+                            weights[ticker] = 1.0 / len(top_stocks)
+                    
+                    elif sizing_method == 'inverse_volatility':
+                        # Allocate more to low-volatility stocks
+                        volatilities = {}
+                        for ticker, score in top_stocks:
+                            if ticker in self.data and len(self.data[ticker]) >= 20:
+                                returns = self.data[ticker]['Close'].pct_change().dropna()
+                                # Use last 60 days if available, else all data
+                                recent_returns = returns.iloc[-60:] if len(returns) > 60 else returns
+                                vol = recent_returns.std() * (252 ** 0.5)  # Annualized
+                                volatilities[ticker] = vol if vol > 0 else 0.01  # Avoid div by zero
+                            else:
+                                volatilities[ticker] = 0.3  # Default 30% annual vol
+                        
+                        # Inverse volatility weights
+                        inv_vols = {t: 1/v for t, v in volatilities.items()}
+                        total_inv_vol = sum(inv_vols.values())
+                        for ticker, score in top_stocks:
+                            weights[ticker] = inv_vols[ticker] / total_inv_vol
+                    
+                    elif sizing_method == 'score_weighted':
+                        # Allocate more to higher-scoring stocks
+                        total_score = sum(abs(score) for _, score in top_stocks)
+                        if total_score > 0:
+                            for ticker, score in top_stocks:
+                                weights[ticker] = abs(score) / total_score
+                        else:
+                            # Fallback to equal weight
+                            for ticker, score in top_stocks:
+                                weights[ticker] = 1.0 / len(top_stocks)
+                    
+                    elif sizing_method == 'risk_parity':
+                        # Equal risk contribution (volatility-adjusted)
+                        volatilities = {}
+                        for ticker, score in top_stocks:
+                            if ticker in self.data and len(self.data[ticker]) >= 20:
+                                returns = self.data[ticker]['Close'].pct_change().dropna()
+                                recent_returns = returns.iloc[-60:] if len(returns) > 60 else returns
+                                vol = recent_returns.std() * (252 ** 0.5)
+                                volatilities[ticker] = vol if vol > 0 else 0.01
+                            else:
+                                volatilities[ticker] = 0.3
+                        
+                        # Risk parity: weight inversely proportional to vol squared
+                        inv_vol_sq = {t: 1/(v**2) for t, v in volatilities.items()}
+                        total_inv_vol_sq = sum(inv_vol_sq.values())
+                        for ticker, score in top_stocks:
+                            weights[ticker] = inv_vol_sq[ticker] / total_inv_vol_sq
+                    
+                    else:
+                        # Default: equal weight
+                        for ticker, score in top_stocks:
+                            weights[ticker] = 1.0 / len(top_stocks)
+                    
+                    # Apply max position cap if enabled
+                    if use_cap:
+                        max_weight = max_pct / 100.0
+                        # Cap weights and redistribute excess
+                        excess = 0.0
+                        uncapped_count = 0
+                        for ticker in weights:
+                            if weights[ticker] > max_weight:
+                                excess += weights[ticker] - max_weight
+                                weights[ticker] = max_weight
+                            else:
+                                uncapped_count += 1
+                        
+                        # Redistribute excess proportionally to uncapped positions
+                        if uncapped_count > 0 and excess > 0:
+                            redistribute = excess / uncapped_count
+                            for ticker in weights:
+                                if weights[ticker] < max_weight:
+                                    weights[ticker] += redistribute
+                    
+                    # Buy based on calculated weights
                     for ticker, score in top_stocks:
+                        position_value = available_for_stocks * weights[ticker]
                         buy_price = self._get_scalar(self.data[ticker].loc[date, 'Close'])
                         shares = int(position_value / buy_price)
                         

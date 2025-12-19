@@ -205,6 +205,41 @@ with main_tabs[0]:
                                      index=1,
                                      help="If rebalance day is holiday, use this option")
         
+        st.markdown("**Position Sizing**")
+        position_sizing_method = st.selectbox(
+            "Sizing Method",
+            ["Equal Weight", "Inverse Volatility", "Score-Weighted", "Risk Parity"],
+            index=0,
+            help="""
+            Equal Weight: Divide capital equally among all stocks
+            Inverse Volatility: Allocate more to lower volatility stocks
+            Score-Weighted: Allocate more to higher scoring stocks
+            Risk Parity: Equal risk contribution from each stock
+            """
+        )
+        
+        use_max_position_cap = st.checkbox(
+            "Apply Max Position Cap",
+            value=False,
+            help="Limit maximum allocation to any single stock (recommended with vol-based methods)"
+        )
+        
+        max_position_pct = 15  # Default
+        if use_max_position_cap:
+            max_position_pct = st.number_input(
+                "Max Position %",
+                5, 50, 15,
+                help="Maximum % of portfolio any single stock can hold"
+            )
+        
+        # Create position sizing config
+        position_sizing_config = {
+            'method': position_sizing_method.lower().replace(' ', '_').replace('-', '_'),
+            'use_cap': use_max_position_cap,
+            'max_pct': max_position_pct
+        }
+        
+        
         st.markdown("**Regime Filter**")
         use_regime_filter = st.checkbox("Enable Regime Filter", value=False)
         
@@ -387,7 +422,8 @@ with main_tabs[0]:
                             rebal_config,
                             regime_config,
                             uncorrelated_config,
-                            reinvest_profits
+                            reinvest_profits,
+                            position_sizing_config
                         )
                         metrics = engine.get_metrics()
                         
