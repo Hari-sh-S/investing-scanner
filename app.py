@@ -184,6 +184,10 @@ with main_tabs[0]:
         reinvest_profits = st.checkbox("Reinvest Profits", value=True,
                                        help="If enabled, reinvest starting capital + profits. If disabled, only reinvest initial capital amount.")
         
+        use_historical_universe = st.checkbox("Historical Universe (Beta)", value=False,
+                                             help="Use point-in-time index constituents to avoid survivorship bias. "
+                                                  "Only uses stocks that were in the index at each rebalance date.")
+        
         st.markdown("**Time Period**")
         start_date = st.date_input("Start Date", datetime.date(2020, 1, 1))
         end_date = st.date_input("End Date", datetime.date.today())
@@ -431,6 +435,12 @@ with main_tabs[0]:
                             'alt_day': alt_day_option
                         }
                         
+                        # Build historical universe config
+                        historical_universe_config = {
+                            'enabled': use_historical_universe,
+                            'universe_name': selected_universe
+                        } if use_historical_universe else None
+                        
                         engine.run_rebalance_strategy(
                             formula, 
                             num_stocks,
@@ -439,7 +449,8 @@ with main_tabs[0]:
                             regime_config,
                             uncorrelated_config,
                             reinvest_profits,
-                            position_sizing_config
+                            position_sizing_config,
+                            historical_universe_config
                         )
                         metrics = engine.get_metrics()
                         

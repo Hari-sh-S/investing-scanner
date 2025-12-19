@@ -173,8 +173,48 @@ def _load_nse_cache():
     return {}
 
 
-def get_universe(name):
-    """Get stock list for a given universe name. Uses NSE cache if available."""
+def get_universe(name, as_of_date=None):
+    """
+    Get stock list for a given universe name.
+    
+    Args:
+        name: Universe name (e.g., 'NIFTY 500')
+        as_of_date: Optional date for point-in-time lookup (survivorship-bias free)
+                   If None, returns current constituents
+    
+    Returns:
+        List of stock symbols
+    """
+    # If as_of_date provided, try historical constituents first
+    if as_of_date is not None:
+        try:
+            from historical_constituents import get_index_universe, get_universe_with_fallback
+            import pandas as pd
+            
+            # Convert universe name to index name format (e.g., "NIFTY 500" -> "NIFTY500")
+            index_name = name.replace(' ', '').upper()
+            
+            # Convert date if needed
+            if not isinstance(as_of_date, pd.Timestamp):
+                as_of_date = pd.Timestamp(as_of_date)
+            
+            # Try historical, fallback to current
+            current_universe = _get_current_universe(name)
+            historical, used_historical = get_universe_with_fallback(
+                index_name, as_of_date, current_universe
+            )
+            return historical
+        except ImportError:
+            pass  # historical_constituents not available
+        except Exception as e:
+            print(f"Warning: Historical constituents lookup failed: {e}")
+    
+    # Default: return current constituents
+    return _get_current_universe(name)
+
+
+def _get_current_universe(name):
+    """Get current (today's) universe - internal helper."""
     # First try NSE cache
     cached = _load_nse_cache()
     if name in cached and cached[name]:

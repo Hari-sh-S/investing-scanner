@@ -540,12 +540,15 @@ class PortfolioEngine:
 
     def run_rebalance_strategy(self, scoring_formula, num_stocks, exit_rank, 
                               rebal_config, regime_config=None, uncorrelated_config=None, 
-                              reinvest_profits=True, position_sizing_config=None):
+                              reinvest_profits=True, position_sizing_config=None,
+                              historical_universe_config=None):
         """
         Advanced backtesting engine with all Sigma Scanner features.
         
         position_sizing_config: dict with 'method' (equal_weight, inverse_volatility, 
                                score_weighted, risk_parity), 'use_cap' (bool), 'max_pct' (int)
+        historical_universe_config: dict with 'enabled' (bool), 'universe_name' (str)
+                                   If enabled, uses point-in-time index constituents
         """
         if not self.data:
             print("No data available")
@@ -903,11 +906,25 @@ class PortfolioEngine:
                 scores = {}
                 uncorrelated_asset_ticker = uncorrelated_config['asset'] if uncorrelated_config else None
                 
+                # Get historical universe if enabled
+                historical_universe = None
+                if historical_universe_config and historical_universe_config.get('enabled'):
+                    try:
+                        from nifty_universe import get_universe
+                        universe_name = historical_universe_config.get('universe_name', 'NIFTY 500')
+                        historical_universe = set(get_universe(universe_name, as_of_date=date))
+                        print(f"   [HISTORICAL] Using {len(historical_universe)} stocks from {universe_name} as of {date.date()}")
+                    except Exception as e:
+                        print(f"   [WARN] Historical universe lookup failed: {e}")
+                
                 # Collect all rows for this date (excluding uncorrelated asset)
                 date_rows = {}
                 for ticker, df in self.data.items():
                     # Skip uncorrelated asset - it's not a stock
                     if ticker == uncorrelated_asset_ticker:
+                        continue
+                    # Skip if not in historical universe (survivorship bias fix)
+                    if historical_universe is not None and ticker not in historical_universe:
                         continue
                     if date in df.index:
                         date_rows[ticker] = df.loc[date]
