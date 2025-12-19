@@ -1144,8 +1144,8 @@ with main_tabs[0]:
                                             theo_losses = [abs(p) for p in theoretical_pnls if p < 0]
                                             
                                             theoretical_win_rate = len(theo_wins) / len(theoretical_pnls) * 100 if theoretical_pnls else 0
-                                            theoretical_avg_win = np.mean(theo_wins) if theo_wins else 0
-                                            theoretical_avg_loss = np.mean(theo_losses) if theo_losses else 0
+                                            theoretical_avg_win = sum(theo_wins) / len(theo_wins) if theo_wins else 0
+                                            theoretical_avg_loss = sum(theo_losses) / len(theo_losses) if theo_losses else 0
                                             
                                             win_pct = len(theo_wins) / len(theoretical_pnls) if theoretical_pnls else 0
                                             loss_pct = len(theo_losses) / len(theoretical_pnls) if theoretical_pnls else 0
