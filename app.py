@@ -1071,57 +1071,29 @@ with main_tabs[0]:
                                     st.markdown("---")
                                     st.markdown("### 📋 Metrics Comparison (Before vs After Filter)")
                                     
-                                    actual_final = engine.portfolio_df['Portfolio Value'].iloc[-1]
-                                    theoretical_final = theoretical_df['Theoretical_Equity'].iloc[-1]
+                                    # === ACTUAL METRICS - Use engine.get_metrics() to match Performance tab ===
+                                    actual_metrics = metrics  # Already calculated from engine.get_metrics()
+                                    actual_final = actual_metrics['Final Value']
+                                    actual_return_pct = actual_metrics['Return %']
+                                    actual_cagr = actual_metrics['CAGR %']
+                                    actual_max_dd = actual_metrics['Max Drawdown %']
+                                    actual_volatility = actual_metrics['Volatility %']
+                                    actual_sharpe = actual_metrics['Sharpe Ratio']
+                                    actual_win_rate = actual_metrics['Win Rate %']
+                                    actual_expectancy = actual_metrics['Expectancy']
+                                    actual_total_trades = actual_metrics['Total Trades']
+                                    actual_max_wins = actual_metrics['Max Consecutive Wins']
+                                    actual_max_losses = actual_metrics['Max Consecutive Losses']
+                                    actual_avg_win = actual_metrics['Avg Win']
+                                    actual_avg_loss = actual_metrics['Avg Loss']
+                                    actual_days_to_recover = actual_metrics['Days to Recover from DD']
                                     
                                     # Common calculations
                                     days = (engine.portfolio_df.index[-1] - engine.portfolio_df.index[0]).days
                                     years = days / 365.25
-                                    
-                                    # === ACTUAL METRICS ===
-                                    actual_return_pct = ((actual_final / engine.initial_capital) - 1) * 100
-                                    actual_cagr = ((actual_final / engine.initial_capital) ** (1 / years) - 1) * 100 if years > 0 else 0
-                                    actual_running_max = engine.portfolio_df['Portfolio Value'].cummax()
-                                    actual_dd_series = ((engine.portfolio_df['Portfolio Value'] - actual_running_max) / actual_running_max * 100)
-                                    actual_max_dd = abs(actual_dd_series.min())
-                                    actual_daily_returns = engine.portfolio_df['Portfolio Value'].pct_change().dropna()
-                                    actual_volatility = actual_daily_returns.std() * (252 ** 0.5) * 100
-                                    actual_sharpe = (actual_cagr - 6) / actual_volatility if actual_volatility > 0 else 0
-                                    
-                                    # Trade-based metrics for actual
-                                    actual_trades = engine.trades_df if hasattr(engine, 'trades_df') and not engine.trades_df.empty else pd.DataFrame()
-                                    actual_total_trades = len(actual_trades)
                                     actual_trades_per_year = actual_total_trades / years if years > 0 else 0
                                     
-                                    # Win rate and expectancy from daily returns (for fair comparison)
-                                    # Using daily returns instead of trades for consistency with theoretical
-                                    actual_wins_days = len(actual_daily_returns[actual_daily_returns > 0])
-                                    actual_losses_days = len(actual_daily_returns[actual_daily_returns <= 0])
-                                    actual_win_rate = actual_wins_days / len(actual_daily_returns) * 100 if len(actual_daily_returns) > 0 else 0
-                                    actual_avg_win = actual_daily_returns[actual_daily_returns > 0].mean() * engine.initial_capital if actual_wins_days > 0 else 0
-                                    actual_avg_loss = abs(actual_daily_returns[actual_daily_returns <= 0].mean() * engine.initial_capital) if actual_losses_days > 0 else 0
-                                    actual_expectancy = (actual_win_rate/100 * actual_avg_win) - ((1 - actual_win_rate/100) * actual_avg_loss) if actual_avg_win > 0 else 0
-                                    
-                                    # Consecutive wins/losses from daily returns
-                                    actual_wins_streak = actual_losses_streak = actual_max_wins = actual_max_losses = 0
-                                    for ret in actual_daily_returns:
-                                        if ret > 0:
-                                            actual_wins_streak += 1
-                                            actual_losses_streak = 0
-                                            actual_max_wins = max(actual_max_wins, actual_wins_streak)
-                                        else:
-                                            actual_losses_streak += 1
-                                            actual_wins_streak = 0
-                                            actual_max_losses = max(actual_max_losses, actual_losses_streak)
-                                    
-                                    # Days to recover from max DD
-                                    actual_dd_min_idx = actual_dd_series.idxmin()
-                                    actual_recovery_mask = (engine.portfolio_df.index > actual_dd_min_idx) & (actual_dd_series >= -0.1)
-                                    if actual_recovery_mask.any():
-                                        actual_recovery_date = engine.portfolio_df.index[actual_recovery_mask][0]
-                                        actual_days_to_recover = (actual_recovery_date - actual_dd_min_idx).days
-                                    else:
-                                        actual_days_to_recover = (engine.portfolio_df.index[-1] - actual_dd_min_idx).days  # Still recovering
+                                    theoretical_final = theoretical_df['Theoretical_Equity'].iloc[-1]
                                     
                                     # === THEORETICAL METRICS ===
                                     theoretical_return_pct = ((theoretical_final / engine.initial_capital) - 1) * 100
