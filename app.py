@@ -450,7 +450,7 @@ with main_tabs[0]:
                             uncorrelated_config,
                             reinvest_profits,
                             position_sizing_config,
-                            historical_universe_config
+                            historical_universe_config=historical_universe_config
                         )
                         metrics = engine.get_metrics()
                         
