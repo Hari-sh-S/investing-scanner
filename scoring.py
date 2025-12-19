@@ -145,6 +145,7 @@ class ScoreParser:
     def get_example_formulas(self):
         """Returns a dictionary of example formulas with descriptions."""
         return {
+            # Basic formulas
             "Simple Momentum": "6 Month Performance",
             "Risk-Adjusted Momentum": "(6 Month Performance / 6 Month Volatility)",
             "Weighted Performance": "(70% * 6 Month Performance) + (20% * 3 Month Performance) + (10% * 1 Month Performance)",
@@ -153,4 +154,15 @@ class ScoreParser:
             "Calmar Focus": "6 Month Calmar",
             "Low Volatility": "1 / 3 Month Volatility",
             "Momentum + Quality": "(6 Month Performance * 6 Month Sharpe)",
+            # Advanced formulas
+            "Trend Consistency": "(6 Month Performance / 1 Month Volatility) * 6 Month Sharpe",
+            "Acceleration Momentum": "(3 Month Performance - 6 Month Performance) / 1 Month Volatility",
+            "Drawdown-Aware Momentum": "6 Month Performance / 6 Month Max Drawdown",
+            "Defensive Momentum": "6 Month Performance / 3 Month Volatility",
+            "Smooth Returns": "6 Month Sharpe * 6 Month Sortino",
+            "Multi-Horizon Momentum": "(1 Month Performance + 3 Month Performance + 6 Month Performance) / 3",
+            "Crash-Resistant Momentum": "6 Month Performance / 6 Month Sortino",  # Sortino uses downside vol
+            "Momentum Persistence": "6 Month Performance / (1 + 6 Month Volatility)",
+            "Quality-Adjusted Trend": "(6 Month Performance * 6 Month Sharpe) / 6 Month Max Drawdown",
+            "Regime-Adaptive Momentum": "(9 Month Performance * 3 Month Sharpe) / 1 Month Volatility",
         }
