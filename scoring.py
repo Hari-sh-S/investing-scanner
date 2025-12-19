@@ -12,6 +12,9 @@ class ScoreParser:
             # Volatility
             '1 Month Volatility', '3 Month Volatility', '6 Month Volatility', 
             '9 Month Volatility', '1 Year Volatility',
+            # Downside Volatility (negative returns only)
+            '1 Month Downside Volatility', '3 Month Downside Volatility', '6 Month Downside Volatility',
+            '9 Month Downside Volatility', '1 Year Downside Volatility',
             # Max Drawdown
             '1 Month Max Drawdown', '3 Month Max Drawdown', '6 Month Max Drawdown',
             '9 Month Max Drawdown', '1 Year Max Drawdown',
@@ -32,6 +35,9 @@ class ScoreParser:
                           '9 Month Performance', '1 Year Performance'],
             'Volatility': ['1 Month Volatility', '3 Month Volatility', '6 Month Volatility',
                          '9 Month Volatility', '1 Year Volatility'],
+            'Downside Volatility': ['1 Month Downside Volatility', '3 Month Downside Volatility', 
+                                   '6 Month Downside Volatility', '9 Month Downside Volatility', 
+                                   '1 Year Downside Volatility'],
             'Max Drawdown': ['1 Month Max Drawdown', '3 Month Max Drawdown', '6 Month Max Drawdown',
                            '9 Month Max Drawdown', '1 Year Max Drawdown'],
             'Sharpe Ratio': ['1 Month Sharpe', '3 Month Sharpe', '6 Month Sharpe',
@@ -161,7 +167,7 @@ class ScoreParser:
             "Defensive Momentum": "6 Month Performance / 3 Month Volatility",
             "Smooth Returns": "6 Month Sharpe * 6 Month Sortino",
             "Multi-Horizon Momentum": "(1 Month Performance + 3 Month Performance + 6 Month Performance) / 3",
-            "Crash-Resistant Momentum": "6 Month Performance / 6 Month Sortino",  # Sortino uses downside vol
+            "Crash-Resistant Momentum": "6 Month Performance / 6 Month Downside Volatility",
             "Momentum Persistence": "6 Month Performance / (1 + 6 Month Volatility)",
             "Quality-Adjusted Trend": "(6 Month Performance * 6 Month Sharpe) / 6 Month Max Drawdown",
             "Regime-Adaptive Momentum": "(9 Month Performance * 3 Month Sharpe) / 1 Month Volatility",

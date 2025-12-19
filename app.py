@@ -350,6 +350,10 @@ with main_tabs[0]:
         for m in metric_groups.get('Volatility', ["1 Month Volatility", "3 Month Volatility", "6 Month Volatility"]):
             st.caption(m)
         
+        st.markdown("**Downside Volatility**")
+        for m in metric_groups.get('Downside Volatility', []):
+            st.caption(m)
+        
         st.markdown("**Max Drawdown**")
         for m in metric_groups.get('Max Drawdown', []):
             st.caption(m)
