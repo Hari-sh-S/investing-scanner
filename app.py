@@ -338,16 +338,28 @@ with main_tabs[0]:
     
     with col_metrics:
         st.subheader("Metrics")
+        
+        # Get metric groups from parser
+        metric_groups = parser.metric_groups if hasattr(parser, 'metric_groups') else {}
+        
         st.markdown("**Performance**")
-        for m in ["1 Month Performance", "3 Month Performance", "6 Month Performance"]:
+        for m in metric_groups.get('Performance', ["1 Month Performance", "3 Month Performance", "6 Month Performance"]):
             st.caption(m)
         
         st.markdown("**Volatility**")
-        for m in ["1 Month Volatility", "3 Month Volatility", "6 Month Volatility"]:
+        for m in metric_groups.get('Volatility', ["1 Month Volatility", "3 Month Volatility", "6 Month Volatility"]):
+            st.caption(m)
+        
+        st.markdown("**Max Drawdown**")
+        for m in metric_groups.get('Max Drawdown', []):
             st.caption(m)
         
         st.markdown("**Risk-Adjusted**")
-        for m in ["6 Month Sharpe", "6 Month Sortino", "6 Month Calmar"]:
+        for m in metric_groups.get('Sharpe Ratio', ["6 Month Sharpe"]):
+            st.caption(m)
+        for m in metric_groups.get('Sortino Ratio', ["6 Month Sortino"]):
+            st.caption(m)
+        for m in metric_groups.get('Calmar Ratio', ["6 Month Calmar"]):
             st.caption(m)
     
     # Results Section
@@ -1081,29 +1093,26 @@ with main_tabs[0]:
                                     actual_total_trades = len(actual_trades)
                                     actual_trades_per_year = actual_total_trades / years if years > 0 else 0
                                     
-                                    if not actual_trades.empty and 'P/L' in actual_trades.columns:
-                                        actual_wins = actual_trades[actual_trades['P/L'] > 0]
-                                        actual_losses = actual_trades[actual_trades['P/L'] <= 0]
-                                        actual_win_rate = len(actual_wins) / len(actual_trades) * 100 if len(actual_trades) > 0 else 0
-                                        actual_avg_win = actual_wins['P/L'].mean() if len(actual_wins) > 0 else 0
-                                        actual_avg_loss = abs(actual_losses['P/L'].mean()) if len(actual_losses) > 0 else 0
-                                        actual_expectancy = (actual_win_rate/100 * actual_avg_win) - ((1 - actual_win_rate/100) * actual_avg_loss)
-                                        
-                                        # Consecutive wins/losses
-                                        actual_pnl = actual_trades['P/L'].values
-                                        actual_wins_streak = actual_losses_streak = actual_max_wins = actual_max_losses = 0
-                                        for pnl in actual_pnl:
-                                            if pnl > 0:
-                                                actual_wins_streak += 1
-                                                actual_losses_streak = 0
-                                                actual_max_wins = max(actual_max_wins, actual_wins_streak)
-                                            else:
-                                                actual_losses_streak += 1
-                                                actual_wins_streak = 0
-                                                actual_max_losses = max(actual_max_losses, actual_losses_streak)
-                                    else:
-                                        actual_win_rate = actual_avg_win = actual_avg_loss = actual_expectancy = 0
-                                        actual_max_wins = actual_max_losses = 0
+                                    # Win rate and expectancy from daily returns (for fair comparison)
+                                    # Using daily returns instead of trades for consistency with theoretical
+                                    actual_wins_days = len(actual_daily_returns[actual_daily_returns > 0])
+                                    actual_losses_days = len(actual_daily_returns[actual_daily_returns <= 0])
+                                    actual_win_rate = actual_wins_days / len(actual_daily_returns) * 100 if len(actual_daily_returns) > 0 else 0
+                                    actual_avg_win = actual_daily_returns[actual_daily_returns > 0].mean() * engine.initial_capital if actual_wins_days > 0 else 0
+                                    actual_avg_loss = abs(actual_daily_returns[actual_daily_returns <= 0].mean() * engine.initial_capital) if actual_losses_days > 0 else 0
+                                    actual_expectancy = (actual_win_rate/100 * actual_avg_win) - ((1 - actual_win_rate/100) * actual_avg_loss) if actual_avg_win > 0 else 0
+                                    
+                                    # Consecutive wins/losses from daily returns
+                                    actual_wins_streak = actual_losses_streak = actual_max_wins = actual_max_losses = 0
+                                    for ret in actual_daily_returns:
+                                        if ret > 0:
+                                            actual_wins_streak += 1
+                                            actual_losses_streak = 0
+                                            actual_max_wins = max(actual_max_wins, actual_wins_streak)
+                                        else:
+                                            actual_losses_streak += 1
+                                            actual_wins_streak = 0
+                                            actual_max_losses = max(actual_max_losses, actual_losses_streak)
                                     
                                     # Days to recover from max DD
                                     actual_dd_min_idx = actual_dd_series.idxmin()
