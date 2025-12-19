@@ -1026,38 +1026,126 @@ with main_tabs[0]:
                                     actual_final = engine.portfolio_df['Portfolio Value'].iloc[-1]
                                     theoretical_final = theoretical_df['Theoretical_Equity'].iloc[-1]
                                     
-                                    # Actual metrics
-                                    actual_return_pct = ((actual_final / engine.initial_capital) - 1) * 100
+                                    # Common calculations
                                     days = (engine.portfolio_df.index[-1] - engine.portfolio_df.index[0]).days
                                     years = days / 365.25
+                                    
+                                    # === ACTUAL METRICS ===
+                                    actual_return_pct = ((actual_final / engine.initial_capital) - 1) * 100
                                     actual_cagr = ((actual_final / engine.initial_capital) ** (1 / years) - 1) * 100 if years > 0 else 0
                                     actual_running_max = engine.portfolio_df['Portfolio Value'].cummax()
-                                    actual_dd = ((engine.portfolio_df['Portfolio Value'] - actual_running_max) / actual_running_max * 100).min()
-                                    actual_max_dd = abs(actual_dd)
+                                    actual_dd_series = ((engine.portfolio_df['Portfolio Value'] - actual_running_max) / actual_running_max * 100)
+                                    actual_max_dd = abs(actual_dd_series.min())
                                     actual_daily_returns = engine.portfolio_df['Portfolio Value'].pct_change().dropna()
                                     actual_volatility = actual_daily_returns.std() * (252 ** 0.5) * 100
-                                    actual_sharpe = (actual_cagr - 6) / actual_volatility if actual_volatility > 0 else 0  # 6% risk-free
+                                    actual_sharpe = (actual_cagr - 6) / actual_volatility if actual_volatility > 0 else 0
                                     
-                                    # Theoretical metrics
+                                    # Trade-based metrics for actual
+                                    actual_trades = engine.trades_df if hasattr(engine, 'trades_df') and not engine.trades_df.empty else pd.DataFrame()
+                                    actual_total_trades = len(actual_trades)
+                                    actual_trades_per_year = actual_total_trades / years if years > 0 else 0
+                                    
+                                    if not actual_trades.empty and 'P/L' in actual_trades.columns:
+                                        actual_wins = actual_trades[actual_trades['P/L'] > 0]
+                                        actual_losses = actual_trades[actual_trades['P/L'] <= 0]
+                                        actual_win_rate = len(actual_wins) / len(actual_trades) * 100 if len(actual_trades) > 0 else 0
+                                        actual_avg_win = actual_wins['P/L'].mean() if len(actual_wins) > 0 else 0
+                                        actual_avg_loss = abs(actual_losses['P/L'].mean()) if len(actual_losses) > 0 else 0
+                                        actual_expectancy = (actual_win_rate/100 * actual_avg_win) - ((1 - actual_win_rate/100) * actual_avg_loss)
+                                        
+                                        # Consecutive wins/losses
+                                        actual_pnl = actual_trades['P/L'].values
+                                        actual_wins_streak = actual_losses_streak = actual_max_wins = actual_max_losses = 0
+                                        for pnl in actual_pnl:
+                                            if pnl > 0:
+                                                actual_wins_streak += 1
+                                                actual_losses_streak = 0
+                                                actual_max_wins = max(actual_max_wins, actual_wins_streak)
+                                            else:
+                                                actual_losses_streak += 1
+                                                actual_wins_streak = 0
+                                                actual_max_losses = max(actual_max_losses, actual_losses_streak)
+                                    else:
+                                        actual_win_rate = actual_avg_win = actual_avg_loss = actual_expectancy = 0
+                                        actual_max_wins = actual_max_losses = 0
+                                    
+                                    # Days to recover from max DD
+                                    actual_dd_min_idx = actual_dd_series.idxmin()
+                                    actual_recovery_mask = (engine.portfolio_df.index > actual_dd_min_idx) & (actual_dd_series >= -0.1)
+                                    if actual_recovery_mask.any():
+                                        actual_recovery_date = engine.portfolio_df.index[actual_recovery_mask][0]
+                                        actual_days_to_recover = (actual_recovery_date - actual_dd_min_idx).days
+                                    else:
+                                        actual_days_to_recover = (engine.portfolio_df.index[-1] - actual_dd_min_idx).days  # Still recovering
+                                    
+                                    # === THEORETICAL METRICS ===
                                     theoretical_return_pct = ((theoretical_final / engine.initial_capital) - 1) * 100
                                     theoretical_cagr = ((theoretical_final / engine.initial_capital) ** (1 / years) - 1) * 100 if years > 0 else 0
                                     theoretical_running_max = theoretical_df['Theoretical_Equity'].cummax()
-                                    theoretical_dd = ((theoretical_df['Theoretical_Equity'] - theoretical_running_max) / theoretical_running_max * 100).min()
-                                    theoretical_max_dd = abs(theoretical_dd)
+                                    theoretical_dd_series = ((theoretical_df['Theoretical_Equity'] - theoretical_running_max) / theoretical_running_max * 100)
+                                    theoretical_max_dd = abs(theoretical_dd_series.min())
                                     theoretical_daily_returns = theoretical_df['Theoretical_Equity'].pct_change().dropna()
                                     theoretical_volatility = theoretical_daily_returns.std() * (252 ** 0.5) * 100
                                     theoretical_sharpe = (theoretical_cagr - 6) / theoretical_volatility if theoretical_volatility > 0 else 0
                                     
-                                    # Create comparison dataframe
+                                    # For theoretical, we don't have separate trades - use same count as proxy
+                                    # but calculate based on theoretical P/L curve
+                                    theoretical_total_trades = actual_total_trades  # Same rebalance schedule
+                                    theoretical_trades_per_year = theoretical_total_trades / years if years > 0 else 0
+                                    
+                                    # Approximate win rate from daily returns for theoretical
+                                    theoretical_wins = len(theoretical_daily_returns[theoretical_daily_returns > 0])
+                                    theoretical_losses = len(theoretical_daily_returns[theoretical_daily_returns <= 0])
+                                    theoretical_win_rate = theoretical_wins / len(theoretical_daily_returns) * 100 if len(theoretical_daily_returns) > 0 else 0
+                                    theoretical_avg_win = theoretical_daily_returns[theoretical_daily_returns > 0].mean() * engine.initial_capital if len(theoretical_daily_returns[theoretical_daily_returns > 0]) > 0 else 0
+                                    theoretical_avg_loss = abs(theoretical_daily_returns[theoretical_daily_returns <= 0].mean() * engine.initial_capital) if len(theoretical_daily_returns[theoretical_daily_returns <= 0]) > 0 else 0
+                                    theoretical_expectancy = (theoretical_win_rate/100 * theoretical_avg_win) - ((1 - theoretical_win_rate/100) * theoretical_avg_loss) if theoretical_avg_win > 0 else 0
+                                    
+                                    # Theoretical max consecutive (from daily returns)
+                                    theo_wins_streak = theo_losses_streak = theoretical_max_wins = theoretical_max_losses = 0
+                                    for ret in theoretical_daily_returns:
+                                        if ret > 0:
+                                            theo_wins_streak += 1
+                                            theo_losses_streak = 0
+                                            theoretical_max_wins = max(theoretical_max_wins, theo_wins_streak)
+                                        else:
+                                            theo_losses_streak += 1
+                                            theo_wins_streak = 0
+                                            theoretical_max_losses = max(theoretical_max_losses, theo_losses_streak)
+                                    
+                                    # Days to recover for theoretical
+                                    theo_dd_min_idx = theoretical_dd_series.idxmin()
+                                    theo_recovery_mask = (theoretical_df.index > theo_dd_min_idx) & (theoretical_dd_series >= -0.1)
+                                    if theo_recovery_mask.any():
+                                        theo_recovery_date = theoretical_df.index[theo_recovery_mask][0]
+                                        theoretical_days_to_recover = (theo_recovery_date - theo_dd_min_idx).days
+                                    else:
+                                        theoretical_days_to_recover = (theoretical_df.index[-1] - theo_dd_min_idx).days
+                                    
+                                    # Create comprehensive comparison dataframe
                                     comparison_data = {
-                                        'Metric': ['Final Value', 'Total Return %', 'CAGR %', 'Max Drawdown %', 'Volatility %', 'Sharpe Ratio'],
+                                        'Metric': [
+                                            'Final Value', 'Total Return %', 'CAGR %', 'Max Drawdown %', 
+                                            'Volatility %', 'Sharpe Ratio', 'Win Rate %', 'Expectancy',
+                                            'Total Trades', 'Avg Trades/Year', 'Max Consecutive Wins',
+                                            'Max Consecutive Losses', 'Avg Win', 'Avg Loss', 'Days to Recover'
+                                        ],
                                         'Without Filter': [
                                             f"₹{theoretical_final:,.0f}",
                                             f"{theoretical_return_pct:.2f}%",
                                             f"{theoretical_cagr:.2f}%",
                                             f"{theoretical_max_dd:.2f}%",
                                             f"{theoretical_volatility:.2f}%",
-                                            f"{theoretical_sharpe:.2f}"
+                                            f"{theoretical_sharpe:.2f}",
+                                            f"{theoretical_win_rate:.2f}%",
+                                            f"₹{theoretical_expectancy:,.0f}",
+                                            f"{theoretical_total_trades}",
+                                            f"{theoretical_trades_per_year:.1f}",
+                                            f"{theoretical_max_wins}",
+                                            f"{theoretical_max_losses}",
+                                            f"₹{theoretical_avg_win:,.0f}",
+                                            f"₹{theoretical_avg_loss:,.0f}",
+                                            f"{theoretical_days_to_recover}"
                                         ],
                                         'With Filter': [
                                             f"₹{actual_final:,.0f}",
@@ -1065,23 +1153,33 @@ with main_tabs[0]:
                                             f"{actual_cagr:.2f}%",
                                             f"{actual_max_dd:.2f}%",
                                             f"{actual_volatility:.2f}%",
-                                            f"{actual_sharpe:.2f}"
-                                        ],
-                                        'Change': [
-                                            f"{((actual_final - theoretical_final) / theoretical_final * 100):+.2f}%" if theoretical_final > 0 else "N/A",
-                                            f"{(actual_return_pct - theoretical_return_pct):+.2f}%",
-                                            f"{(actual_cagr - theoretical_cagr):+.2f}%",
-                                            f"{(theoretical_max_dd - actual_max_dd):+.2f}%",  # Positive = reduced DD (good)
-                                            f"{(theoretical_volatility - actual_volatility):+.2f}%",  # Positive = reduced vol (good)
-                                            f"{(actual_sharpe - theoretical_sharpe):+.2f}"
+                                            f"{actual_sharpe:.2f}",
+                                            f"{actual_win_rate:.2f}%",
+                                            f"₹{actual_expectancy:,.0f}",
+                                            f"{actual_total_trades}",
+                                            f"{actual_trades_per_year:.1f}",
+                                            f"{actual_max_wins}",
+                                            f"{actual_max_losses}",
+                                            f"₹{actual_avg_win:,.0f}",
+                                            f"₹{actual_avg_loss:,.0f}",
+                                            f"{actual_days_to_recover}"
                                         ],
                                         'Better?': [
                                             '✅' if actual_final >= theoretical_final else '❌',
                                             '✅' if actual_return_pct >= theoretical_return_pct else '❌',
                                             '✅' if actual_cagr >= theoretical_cagr else '❌',
-                                            '✅' if actual_max_dd <= theoretical_max_dd else '❌',  # Lower DD is better
-                                            '✅' if actual_volatility <= theoretical_volatility else '❌',  # Lower vol is better
-                                            '✅' if actual_sharpe >= theoretical_sharpe else '❌'
+                                            '✅' if actual_max_dd <= theoretical_max_dd else '❌',
+                                            '✅' if actual_volatility <= theoretical_volatility else '❌',
+                                            '✅' if actual_sharpe >= theoretical_sharpe else '❌',
+                                            '✅' if actual_win_rate >= theoretical_win_rate else '❌',
+                                            '✅' if actual_expectancy >= theoretical_expectancy else '❌',
+                                            '➖',  # Total trades neutral
+                                            '➖',  # Avg trades/year neutral
+                                            '✅' if actual_max_wins >= theoretical_max_wins else '❌',
+                                            '✅' if actual_max_losses <= theoretical_max_losses else '❌',
+                                            '✅' if actual_avg_win >= theoretical_avg_win else '❌',
+                                            '✅' if actual_avg_loss <= theoretical_avg_loss else '❌',
+                                            '✅' if actual_days_to_recover <= theoretical_days_to_recover else '❌'
                                         ]
                                     }
                                     
