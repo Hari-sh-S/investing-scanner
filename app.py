@@ -1105,30 +1105,69 @@ with main_tabs[0]:
                                     theoretical_volatility = theoretical_daily_returns.std() * (252 ** 0.5) * 100
                                     theoretical_sharpe = (theoretical_cagr - 6) / theoretical_volatility if theoretical_volatility > 0 else 0
                                     
-                                    # For theoretical, we don't have separate trades - use same count as proxy
-                                    # but calculate based on theoretical P/L curve
-                                    theoretical_total_trades = actual_total_trades  # Same rebalance schedule
+                                    # For theoretical trade metrics, use rebalance-period P/L from theoretical equity
+                                    # Get equity values at each rebalance date to calculate period P/Ls
+                                    theoretical_total_trades = actual_total_trades
                                     theoretical_trades_per_year = theoretical_total_trades / years if years > 0 else 0
                                     
-                                    # Approximate win rate from daily returns for theoretical
-                                    theoretical_wins = len(theoretical_daily_returns[theoretical_daily_returns > 0])
-                                    theoretical_losses = len(theoretical_daily_returns[theoretical_daily_returns <= 0])
-                                    theoretical_win_rate = theoretical_wins / len(theoretical_daily_returns) * 100 if len(theoretical_daily_returns) > 0 else 0
-                                    theoretical_avg_win = theoretical_daily_returns[theoretical_daily_returns > 0].mean() * engine.initial_capital if len(theoretical_daily_returns[theoretical_daily_returns > 0]) > 0 else 0
-                                    theoretical_avg_loss = abs(theoretical_daily_returns[theoretical_daily_returns <= 0].mean() * engine.initial_capital) if len(theoretical_daily_returns[theoretical_daily_returns <= 0]) > 0 else 0
-                                    theoretical_expectancy = (theoretical_win_rate/100 * theoretical_avg_win) - ((1 - theoretical_win_rate/100) * theoretical_avg_loss) if theoretical_avg_win > 0 else 0
-                                    
-                                    # Theoretical max consecutive (from daily returns)
-                                    theo_wins_streak = theo_losses_streak = theoretical_max_wins = theoretical_max_losses = 0
-                                    for ret in theoretical_daily_returns:
-                                        if ret > 0:
-                                            theo_wins_streak += 1
-                                            theo_losses_streak = 0
-                                            theoretical_max_wins = max(theoretical_max_wins, theo_wins_streak)
+                                    # Calculate P/L at each rebalance by finding value changes at rebalance dates
+                                    if not engine.trades_df.empty and 'Date' in engine.trades_df.columns:
+                                        # Get unique rebalance dates (from actual trades)
+                                        rebalance_dates = engine.trades_df['Date'].unique()
+                                        
+                                        # Calculate theoretical P/L between each rebalance period
+                                        theoretical_pnls = []
+                                        for i in range(1, len(rebalance_dates)):
+                                            prev_date = rebalance_dates[i-1]
+                                            curr_date = rebalance_dates[i]
+                                            
+                                            # Find theoretical equity at these dates
+                                            if prev_date in theoretical_df.index and curr_date in theoretical_df.index:
+                                                prev_equity = theoretical_df.loc[prev_date, 'Theoretical_Equity']
+                                                curr_equity = theoretical_df.loc[curr_date, 'Theoretical_Equity']
+                                                pnl = curr_equity - prev_equity
+                                                theoretical_pnls.append(pnl)
+                                            elif len(theoretical_df) > 0:
+                                                # Find nearest dates
+                                                theo_dates = theoretical_df.index
+                                                prev_idx = theo_dates.get_indexer([prev_date], method='nearest')[0]
+                                                curr_idx = theo_dates.get_indexer([curr_date], method='nearest')[0]
+                                                if prev_idx != curr_idx:
+                                                    prev_equity = theoretical_df.iloc[prev_idx]['Theoretical_Equity']
+                                                    curr_equity = theoretical_df.iloc[curr_idx]['Theoretical_Equity']
+                                                    pnl = curr_equity - prev_equity
+                                                    theoretical_pnls.append(pnl)
+                                        
+                                        # Calculate metrics from period P/Ls
+                                        if theoretical_pnls:
+                                            theo_wins = [p for p in theoretical_pnls if p > 0]
+                                            theo_losses = [abs(p) for p in theoretical_pnls if p < 0]
+                                            
+                                            theoretical_win_rate = len(theo_wins) / len(theoretical_pnls) * 100 if theoretical_pnls else 0
+                                            theoretical_avg_win = np.mean(theo_wins) if theo_wins else 0
+                                            theoretical_avg_loss = np.mean(theo_losses) if theo_losses else 0
+                                            
+                                            win_pct = len(theo_wins) / len(theoretical_pnls) if theoretical_pnls else 0
+                                            loss_pct = len(theo_losses) / len(theoretical_pnls) if theoretical_pnls else 0
+                                            theoretical_expectancy = (win_pct * theoretical_avg_win) - (loss_pct * theoretical_avg_loss)
+                                            
+                                            # Max consecutive wins/losses from Period P/Ls
+                                            theo_wins_streak = theo_losses_streak = theoretical_max_wins = theoretical_max_losses = 0
+                                            for pnl in theoretical_pnls:
+                                                if pnl > 0:
+                                                    theo_wins_streak += 1
+                                                    theo_losses_streak = 0
+                                                    theoretical_max_wins = max(theoretical_max_wins, theo_wins_streak)
+                                                else:
+                                                    theo_losses_streak += 1
+                                                    theo_wins_streak = 0
+                                                    theoretical_max_losses = max(theoretical_max_losses, theo_losses_streak)
                                         else:
-                                            theo_losses_streak += 1
-                                            theo_wins_streak = 0
-                                            theoretical_max_losses = max(theoretical_max_losses, theo_losses_streak)
+                                            theoretical_win_rate = theoretical_avg_win = theoretical_avg_loss = theoretical_expectancy = 0
+                                            theoretical_max_wins = theoretical_max_losses = 0
+                                    else:
+                                        theoretical_win_rate = theoretical_avg_win = theoretical_avg_loss = theoretical_expectancy = 0
+                                        theoretical_max_wins = theoretical_max_losses = 0
                                     
                                     # Days to recover for theoretical
                                     theo_dd_min_idx = theoretical_dd_series.idxmin()
