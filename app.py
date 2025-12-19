@@ -469,6 +469,7 @@ with main_tabs[0]:
                             equity_analysis = engine.get_equity_regime_analysis()
                         
                         
+                        
                         # Build tab list dynamically
                         tab_names = ["Performance Metrics", "Charts", "Monthly Breakup", "Monthly Report", "Trade History"]
                         if equity_analysis:
@@ -478,6 +479,11 @@ with main_tabs[0]:
                         is_equity_ma = regime_config and regime_config.get('type') == 'EQUITY_MA'
                         if is_equity_ma:
                             tab_names.append("Equity MA Testing")
+                        
+                        # Check if other regime filters (EMA, MACD, SUPERTREND) are used - add analysis tab
+                        is_other_regime = regime_config and regime_config.get('type') in ['EMA', 'MACD', 'SUPERTREND']
+                        if is_other_regime and equity_analysis:
+                            tab_names.append("Regime Filter Analysis")
                         
                         result_tabs = st.tabs(tab_names)
                         
@@ -965,6 +971,165 @@ with main_tabs[0]:
                                     
                                     st.markdown("---")
                                     st.info(f"**How it works:** When portfolio equity falls below its {ma_period}-day moving average, exposure is reduced to protect capital. When equity recovers above the MA, full exposure resumes.")
+                        
+                        # Regime Filter Analysis Tab (for EMA, MACD, SUPERTREND)
+                        if is_other_regime and equity_analysis and len(tab_names) > 5:
+                            # Find the tab index
+                            regime_tab_idx = len(tab_names) - 1  # Last tab
+                            
+                            with result_tabs[regime_tab_idx]:
+                                regime_type = equity_analysis.get('regime_type', 'Unknown')
+                                regime_value = equity_analysis.get('regime_value', '')
+                                
+                                st.markdown(f"### 📊 {regime_type} Regime Filter Analysis")
+                                st.markdown(f"> Compare your actual returns (with {regime_type} filter) against theoretical returns (without filter)")
+                                
+                                if 'theoretical_curve' in equity_analysis:
+                                    theoretical_df = equity_analysis['theoretical_curve']
+                                    
+                                    # Comparison Chart
+                                    st.markdown("---")
+                                    st.markdown("### 📈 Actual vs Theoretical Equity Curve")
+                                    
+                                    fig_compare = go.Figure()
+                                    
+                                    # Actual equity curve
+                                    fig_compare.add_trace(go.Scatter(
+                                        x=engine.portfolio_df.index,
+                                        y=engine.portfolio_df['Portfolio Value'],
+                                        name=f'Actual (With {regime_type} Filter)',
+                                        line=dict(color='#28a745', width=2)
+                                    ))
+                                    
+                                    # Theoretical equity curve
+                                    fig_compare.add_trace(go.Scatter(
+                                        x=theoretical_df.index,
+                                        y=theoretical_df['Theoretical_Equity'],
+                                        name='Theoretical (No Filter)',
+                                        line=dict(color='#17a2b8', width=2, dash='dot')
+                                    ))
+                                    
+                                    fig_compare.update_layout(
+                                        title=f"Equity Curve: With vs Without {regime_type} Filter",
+                                        xaxis_title="Date",
+                                        yaxis_title="Portfolio Value (₹)",
+                                        height=450,
+                                        template='plotly_dark',
+                                        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+                                    )
+                                    st.plotly_chart(fig_compare, use_container_width=True)
+                                    
+                                    # Calculate comprehensive metrics for both
+                                    st.markdown("---")
+                                    st.markdown("### 📋 Metrics Comparison (Before vs After Filter)")
+                                    
+                                    actual_final = engine.portfolio_df['Portfolio Value'].iloc[-1]
+                                    theoretical_final = theoretical_df['Theoretical_Equity'].iloc[-1]
+                                    
+                                    # Actual metrics
+                                    actual_return_pct = ((actual_final / engine.initial_capital) - 1) * 100
+                                    days = (engine.portfolio_df.index[-1] - engine.portfolio_df.index[0]).days
+                                    years = days / 365.25
+                                    actual_cagr = ((actual_final / engine.initial_capital) ** (1 / years) - 1) * 100 if years > 0 else 0
+                                    actual_running_max = engine.portfolio_df['Portfolio Value'].cummax()
+                                    actual_dd = ((engine.portfolio_df['Portfolio Value'] - actual_running_max) / actual_running_max * 100).min()
+                                    actual_max_dd = abs(actual_dd)
+                                    actual_daily_returns = engine.portfolio_df['Portfolio Value'].pct_change().dropna()
+                                    actual_volatility = actual_daily_returns.std() * (252 ** 0.5) * 100
+                                    actual_sharpe = (actual_cagr - 6) / actual_volatility if actual_volatility > 0 else 0  # 6% risk-free
+                                    
+                                    # Theoretical metrics
+                                    theoretical_return_pct = ((theoretical_final / engine.initial_capital) - 1) * 100
+                                    theoretical_cagr = ((theoretical_final / engine.initial_capital) ** (1 / years) - 1) * 100 if years > 0 else 0
+                                    theoretical_running_max = theoretical_df['Theoretical_Equity'].cummax()
+                                    theoretical_dd = ((theoretical_df['Theoretical_Equity'] - theoretical_running_max) / theoretical_running_max * 100).min()
+                                    theoretical_max_dd = abs(theoretical_dd)
+                                    theoretical_daily_returns = theoretical_df['Theoretical_Equity'].pct_change().dropna()
+                                    theoretical_volatility = theoretical_daily_returns.std() * (252 ** 0.5) * 100
+                                    theoretical_sharpe = (theoretical_cagr - 6) / theoretical_volatility if theoretical_volatility > 0 else 0
+                                    
+                                    # Create comparison dataframe
+                                    comparison_data = {
+                                        'Metric': ['Final Value', 'Total Return %', 'CAGR %', 'Max Drawdown %', 'Volatility %', 'Sharpe Ratio'],
+                                        'Without Filter': [
+                                            f"₹{theoretical_final:,.0f}",
+                                            f"{theoretical_return_pct:.2f}%",
+                                            f"{theoretical_cagr:.2f}%",
+                                            f"{theoretical_max_dd:.2f}%",
+                                            f"{theoretical_volatility:.2f}%",
+                                            f"{theoretical_sharpe:.2f}"
+                                        ],
+                                        'With Filter': [
+                                            f"₹{actual_final:,.0f}",
+                                            f"{actual_return_pct:.2f}%",
+                                            f"{actual_cagr:.2f}%",
+                                            f"{actual_max_dd:.2f}%",
+                                            f"{actual_volatility:.2f}%",
+                                            f"{actual_sharpe:.2f}"
+                                        ],
+                                        'Change': [
+                                            f"{((actual_final - theoretical_final) / theoretical_final * 100):+.2f}%" if theoretical_final > 0 else "N/A",
+                                            f"{(actual_return_pct - theoretical_return_pct):+.2f}%",
+                                            f"{(actual_cagr - theoretical_cagr):+.2f}%",
+                                            f"{(theoretical_max_dd - actual_max_dd):+.2f}%",  # Positive = reduced DD (good)
+                                            f"{(theoretical_volatility - actual_volatility):+.2f}%",  # Positive = reduced vol (good)
+                                            f"{(actual_sharpe - theoretical_sharpe):+.2f}"
+                                        ],
+                                        'Better?': [
+                                            '✅' if actual_final >= theoretical_final else '❌',
+                                            '✅' if actual_return_pct >= theoretical_return_pct else '❌',
+                                            '✅' if actual_cagr >= theoretical_cagr else '❌',
+                                            '✅' if actual_max_dd <= theoretical_max_dd else '❌',  # Lower DD is better
+                                            '✅' if actual_volatility <= theoretical_volatility else '❌',  # Lower vol is better
+                                            '✅' if actual_sharpe >= theoretical_sharpe else '❌'
+                                        ]
+                                    }
+                                    
+                                    comparison_df = pd.DataFrame(comparison_data)
+                                    st.dataframe(comparison_df, use_container_width=True, hide_index=True)
+                                    
+                                    # Summary metrics with color
+                                    st.markdown("---")
+                                    st.markdown("### 🎯 Filter Impact Summary")
+                                    
+                                    sum_col1, sum_col2, sum_col3, sum_col4 = st.columns(4)
+                                    
+                                    return_diff = actual_return_pct - theoretical_return_pct
+                                    dd_reduction = theoretical_max_dd - actual_max_dd
+                                    vol_reduction = theoretical_volatility - actual_volatility
+                                    sharpe_diff = actual_sharpe - theoretical_sharpe
+                                    
+                                    with sum_col1:
+                                        st.metric("Return Impact", f"{return_diff:+.2f}%", 
+                                                 delta=f"{return_diff:+.2f}%",
+                                                 delta_color="normal" if return_diff >= 0 else "inverse")
+                                    with sum_col2:
+                                        st.metric("Drawdown Reduced", f"{dd_reduction:+.2f}%", 
+                                                 delta=f"{dd_reduction:+.2f}%",
+                                                 delta_color="normal" if dd_reduction >= 0 else "inverse")
+                                    with sum_col3:
+                                        st.metric("Volatility Reduced", f"{vol_reduction:+.2f}%", 
+                                                 delta=f"{vol_reduction:+.2f}%",
+                                                 delta_color="normal" if vol_reduction >= 0 else "inverse")
+                                    with sum_col4:
+                                        st.metric("Sharpe Change", f"{sharpe_diff:+.2f}", 
+                                                 delta=f"{sharpe_diff:+.2f}",
+                                                 delta_color="normal" if sharpe_diff >= 0 else "inverse")
+                                    
+                                    # Overall assessment
+                                    st.markdown("---")
+                                    improvements = sum([
+                                        1 if actual_max_dd <= theoretical_max_dd else 0,
+                                        1 if actual_volatility <= theoretical_volatility else 0,
+                                        1 if actual_sharpe >= theoretical_sharpe else 0
+                                    ])
+                                    
+                                    if improvements >= 2 and return_diff >= -5:
+                                        st.success(f"✅ **{regime_type} filter improved risk-adjusted returns.** Lower drawdown/volatility with acceptable return trade-off.")
+                                    elif return_diff > 0:
+                                        st.success(f"✅ **{regime_type} filter improved absolute returns.** Higher returns than without filter.")
+                                    else:
+                                        st.warning(f"⚠️ **{regime_type} filter reduced returns by {abs(return_diff):.2f}%.** The filter was protective but cost performance in this period.")
                     else:
                         st.warning("No trades generated")
                 else:

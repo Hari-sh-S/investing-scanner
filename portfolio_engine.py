@@ -642,6 +642,9 @@ class PortfolioEngine:
         equity_history_for_ma = []  # List of recent equity values for MA calculation
         equity_ma_triggered = False  # True when equity < MA
         
+        # Flag to track theoretical equity for ANY regime filter (for comparison)
+        has_regime_filter = regime_config is not None
+        
         for date in all_dates:
             is_rebalance = date in rebalance_dates
             
@@ -659,8 +662,8 @@ class PortfolioEngine:
                     current_holdings_value += shares * cp
             current_equity = cash + current_holdings_value
             
-            # Track theoretical equity (without EQUITY or EQUITY_MA regime filter)
-            if is_equity_regime or is_equity_ma_regime:
+            # Track theoretical equity (without ANY regime filter affecting trades)
+            if has_regime_filter:
                 theoretical_holdings_value = 0.0
                 for ticker, shares in theoretical_holdings.items():
                     if ticker in self.data:
@@ -959,9 +962,9 @@ class PortfolioEngine:
                                 'Score': score,
                                 'Rank': ranked_stocks.index((ticker, score)) + 1
                             })
-                # Update theoretical holdings (for EQUITY and EQUITY_MA regime comparison)
+                # Update theoretical holdings (for ANY regime filter comparison)
                 # Theoretical curve assumes NO regime filter - always trades normally
-                if (is_equity_regime or is_equity_ma_regime) and is_rebalance:
+                if has_regime_filter and is_rebalance:
                     # First, SELL all theoretical holdings (same as actual rebalance does)
                     for ticker, shares in theoretical_holdings.items():
                         if ticker in self.data and date in self.data[ticker].index:
@@ -1031,22 +1034,24 @@ class PortfolioEngine:
         self.portfolio_df = pd.DataFrame(portfolio_history).set_index('Date')
         self.trades_df = pd.DataFrame(self.trades)
         
-        # Store EQUITY or EQUITY_MA regime analysis data
-        if (is_equity_regime or is_equity_ma_regime) and theoretical_history:
+        # Store regime analysis data for ANY regime filter (for comparison)
+        if has_regime_filter and theoretical_history:
             self.equity_regime_analysis = {
                 'theoretical_curve': pd.DataFrame(theoretical_history).set_index('Date'),
                 'trigger_events': self.regime_trigger_events if is_equity_regime else [],
                 'sl_threshold': equity_sl_pct if is_equity_regime else 0,
                 'is_equity_ma': is_equity_ma_regime,
-                'ma_period': equity_ma_period if is_equity_ma_regime else None
+                'ma_period': equity_ma_period if is_equity_ma_regime else None,
+                'regime_type': regime_config['type'] if regime_config else None,
+                'regime_value': regime_config['value'] if regime_config else None
             }
     
     def get_equity_regime_analysis(self):
-        """Return EQUITY regime filter analysis data for visualization.
+        """Return regime filter analysis data for visualization.
         
         Returns:
-            dict with 'theoretical_curve', 'trigger_events', 'sl_threshold'
-            or None if EQUITY filter was not used
+            dict with 'theoretical_curve', 'trigger_events', 'regime_type', etc.
+            or None if no regime filter was used
         """
         return self.equity_regime_analysis
     
