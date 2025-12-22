@@ -9,6 +9,7 @@ from nifty_universe import (get_all_universe_names, get_universe,
                             get_broad_market_universes, get_sectoral_universes,
                             get_cap_based_universes, get_thematic_universes)
 from report_generator import create_excel_with_charts, create_pdf_report, prepare_complete_log_data
+from monte_carlo import MonteCarloSimulator, extract_trade_pnls
 import datetime
 import io
 import time
@@ -540,7 +541,7 @@ with main_tabs[0]:
                             equity_analysis = engine.get_equity_regime_analysis()
                         
                         # Build tab list dynamically
-                        tab_names = ["Performance Metrics", "Charts", "Monthly Breakup", "Monthly Report", "Trade History"]
+                        tab_names = ["Performance Metrics", "Charts", "Monthly Breakup", "Monthly Report", "Trade History", "Monte Carlo Analysis"]
                         
                         # Check specific regime filter types
                         is_equity = regime_config and regime_config.get('type') == 'EQUITY'
@@ -766,9 +767,118 @@ with main_tabs[0]:
                                     st.info("No completed trades to display")
                             else:
                                 st.info("No trades executed")
+                        
+                        # Monte Carlo Analysis Tab (index 5 - always present)
+                        with result_tabs[5]:
+                            st.markdown("### 🎲 Monte Carlo Analysis")
+                            st.caption("Trade reshuffling simulation to quantify real portfolio risk beyond historical performance")
+                            
+                            if not engine.trades_df.empty:
+                                # Extract trade PnLs
+                                trade_pnls = extract_trade_pnls(engine.trades_df)
+                                
+                                if len(trade_pnls) >= 10:
+                                    # Calculate test duration
+                                    days = (engine.portfolio_df.index[-1] - engine.portfolio_df.index[0]).days
+                                    years = days / 365.25
+                                    
+                                    # Run Monte Carlo simulation
+                                    with st.spinner("Running 10,000 Monte Carlo simulations..."):
+                                        mc = MonteCarloSimulator(
+                                            trade_pnls=trade_pnls,
+                                            initial_capital=engine.initial_capital,
+                                            test_duration_years=years,
+                                            n_simulations=10000
+                                        )
+                                        mc_results = mc.run_simulations()
+                                        interpretations = mc.get_interpretation()
+                                    
+                                    st.success(f"✅ Completed {mc_results['n_simulations']:,} simulations using {mc_results['n_trades']} trades")
+                                    
+                                    # 1. Max Drawdown Section
+                                    st.markdown("#### 📉 Maximum Drawdown Analysis")
+                                    dd_col1, dd_col2, dd_col3 = st.columns(3)
+                                    dd_col1.metric("Historical Max DD", f"{mc_results['historical_max_dd']:.1f}%")
+                                    dd_col2.metric("Monte Carlo 95th %ile", f"{mc_results['mc_max_dd_95']:.1f}%", 
+                                                  delta=f"+{mc_results['mc_max_dd_95'] - mc_results['historical_max_dd']:.1f}%" if mc_results['mc_max_dd_95'] > mc_results['historical_max_dd'] else None)
+                                    dd_col3.metric("Worst Case DD", f"{mc_results['mc_max_dd_worst']:.1f}%")
+                                    st.info(interpretations['max_drawdown'])
+                                    
+                                    st.markdown("---")
+                                    
+                                    # 2. Losing Streak Section
+                                    st.markdown("#### 📊 Worst Losing Streak")
+                                    streak_col1, streak_col2, streak_col3 = st.columns(3)
+                                    streak_col1.metric("Historical Streak", f"{mc_results['historical_losing_streak']} trades")
+                                    streak_col2.metric("Monte Carlo 95th %ile", f"{mc_results['mc_losing_streak_95']} trades")
+                                    streak_col3.metric("Worst Case", f"{mc_results['mc_losing_streak_worst']} trades")
+                                    st.info(interpretations['losing_streak'])
+                                    
+                                    st.markdown("---")
+                                    
+                                    # 3. Probability of Ruin
+                                    st.markdown("#### ⚠️ Probability of Ruin")
+                                    st.caption("Ruin = equity falls below 50% of peak OR below starting capital")
+                                    ruin_col1, ruin_col2 = st.columns(2)
+                                    ruin_pct = mc_results['ruin_probability']
+                                    if ruin_pct == 0:
+                                        ruin_col1.metric("Ruin Probability", "0%", delta="Low Risk", delta_color="off")
+                                    elif ruin_pct < 5:
+                                        ruin_col1.metric("Ruin Probability", f"{ruin_pct:.2f}%", delta="Caution", delta_color="off")
+                                    else:
+                                        ruin_col1.metric("Ruin Probability", f"{ruin_pct:.2f}%", delta="High Risk", delta_color="inverse")
+                                    ruin_col2.metric("Simulations with Ruin", f"{mc_results['ruin_count']:,} / {mc_results['n_simulations']:,}")
+                                    st.info(interpretations['ruin'])
+                                    
+                                    st.markdown("---")
+                                    
+                                    # 4. CAGR Distribution
+                                    st.markdown("#### 📈 CAGR Distribution")
+                                    cagr_col1, cagr_col2, cagr_col3, cagr_col4 = st.columns(4)
+                                    cagr_col1.metric("Historical CAGR", f"{mc_results['historical_cagr']:.1f}%")
+                                    cagr_col2.metric("5th %ile (Bad Luck)", f"{mc_results['mc_cagr_5th']:.1f}%")
+                                    cagr_col3.metric("Median CAGR", f"{mc_results['mc_cagr_median']:.1f}%")
+                                    cagr_col4.metric("95th %ile (Good Luck)", f"{mc_results['mc_cagr_95th']:.1f}%")
+                                    st.info(interpretations['cagr'])
+                                    
+                                    # Summary Table
+                                    st.markdown("---")
+                                    st.markdown("#### 📋 Summary Table")
+                                    summary_data = {
+                                        'Metric': [
+                                            'Max Drawdown',
+                                            'Max Drawdown (95%)',
+                                            'Max Drawdown (Worst)',
+                                            'Worst Losing Streak',
+                                            'Losing Streak (95%)',
+                                            'Probability of Ruin',
+                                            'CAGR (Historical)',
+                                            'CAGR (5th percentile)',
+                                            'CAGR (Median)',
+                                            'CAGR (95th percentile)'
+                                        ],
+                                        'Value': [
+                                            f"{mc_results['historical_max_dd']:.1f}%",
+                                            f"{mc_results['mc_max_dd_95']:.1f}%",
+                                            f"{mc_results['mc_max_dd_worst']:.1f}%",
+                                            f"{mc_results['historical_losing_streak']} trades",
+                                            f"{mc_results['mc_losing_streak_95']} trades",
+                                            f"{mc_results['ruin_probability']:.2f}%",
+                                            f"{mc_results['historical_cagr']:.1f}%",
+                                            f"{mc_results['mc_cagr_5th']:.1f}%",
+                                            f"{mc_results['mc_cagr_median']:.1f}%",
+                                            f"{mc_results['mc_cagr_95th']:.1f}%"
+                                        ]
+                                    }
+                                    st.dataframe(pd.DataFrame(summary_data), use_container_width=True, hide_index=True)
+                                else:
+                                    st.warning(f"Need at least 10 completed trades for Monte Carlo analysis. Currently have {len(trade_pnls)} trades.")
+                            else:
+                                st.info("No trades available for Monte Carlo analysis. Run a backtest first.")
+                        
                         # Equity Regime Testing Tab (only shown if EQUITY regime filter was used)
                         if equity_analysis:
-                            with result_tabs[5]:  # Last tab
+                            with result_tabs[6]:  # Last tab
                                 st.markdown("### 📊 Equity Regime Testing")
                                 st.warning("⚠️ **DISCLAIMER**: This section is for testing purposes only. The theoretical curve shows what would have happened WITHOUT the EQUITY regime filter.")
                                 
