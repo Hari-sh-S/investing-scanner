@@ -871,6 +871,58 @@ with main_tabs[0]:
                                         ]
                                     }
                                     st.dataframe(pd.DataFrame(summary_data), use_container_width=True, hide_index=True)
+                                    
+                                    # Monte Carlo Equity Curves Chart
+                                    st.markdown("---")
+                                    st.markdown("#### 📈 Monte Carlo Equity Curves")
+                                    st.caption("100 simulated equity paths (gray) vs historical path (green)")
+                                    
+                                    sample_curves = mc_results.get('sample_equity_curves', [])
+                                    historical_curve = mc_results.get('historical_equity_curve', [])
+                                    
+                                    if sample_curves and len(sample_curves) > 0:
+                                        fig_mc = go.Figure()
+                                        
+                                        # Plot sample simulation curves (faded gray)
+                                        for idx, curve in enumerate(sample_curves[:100]):
+                                            fig_mc.add_trace(go.Scatter(
+                                                x=list(range(len(curve))),
+                                                y=curve,
+                                                mode='lines',
+                                                line=dict(color='rgba(150, 150, 150, 0.15)', width=1),
+                                                showlegend=False,
+                                                hoverinfo='skip'
+                                            ))
+                                        
+                                        # Plot historical curve (highlighted)
+                                        if historical_curve:
+                                            fig_mc.add_trace(go.Scatter(
+                                                x=list(range(len(historical_curve))),
+                                                y=historical_curve,
+                                                mode='lines',
+                                                line=dict(color='#28a745', width=3),
+                                                name='Historical (Actual)',
+                                                hovertemplate='Trade %{x}<br>Equity: ₹%{y:,.0f}<extra></extra>'
+                                            ))
+                                        
+                                        # Add starting capital line
+                                        n_trades = len(historical_curve) if historical_curve else len(sample_curves[0])
+                                        fig_mc.add_hline(
+                                            y=mc_results['initial_capital'],
+                                            line_dash="dash",
+                                            line_color="yellow",
+                                            annotation_text="Starting Capital"
+                                        )
+                                        
+                                        fig_mc.update_layout(
+                                            title="Monte Carlo Equity Paths (Trade Reshuffling)",
+                                            xaxis_title="Trade Number",
+                                            yaxis_title="Portfolio Value (₹)",
+                                            height=500,
+                                            template='plotly_dark',
+                                            legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
+                                        )
+                                        st.plotly_chart(fig_mc, use_container_width=True)
                                 else:
                                     st.warning(f"Need at least 10 completed trades for Monte Carlo analysis. Currently have {len(trade_pnls)} trades.")
                             else:

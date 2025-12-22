@@ -97,6 +97,17 @@ class MonteCarloSimulator:
         cagrs = np.zeros(self.n_simulations)
         ruin_count = 0
         
+        # Store sample equity curves for charting (store first 100)
+        n_sample_curves = min(100, self.n_simulations)
+        sample_equity_curves = []
+        
+        # Also compute and store historical equity curve
+        historical_curve = [self.initial_capital]
+        equity_hist = self.initial_capital
+        for pnl in self.trade_pnls:
+            equity_hist += pnl
+            historical_curve.append(equity_hist)
+        
         # Run simulations
         for i in range(self.n_simulations):
             # Shuffle trade PnLs
@@ -110,8 +121,16 @@ class MonteCarloSimulator:
             max_losing_streak = 0
             ruin_hit = False
             
+            # Track equity curve for sample simulations
+            if i < n_sample_curves:
+                curve = [self.initial_capital]
+            
             for pnl in shuffled_pnls:
                 equity += pnl
+                
+                # Store for sample curves
+                if i < n_sample_curves:
+                    curve.append(equity)
                 
                 # Update peak
                 if equity > peak:
@@ -134,6 +153,10 @@ class MonteCarloSimulator:
                 if not ruin_hit:
                     if equity < 0.5 * peak or equity < self.initial_capital:
                         ruin_hit = True
+            
+            # Store sample equity curve
+            if i < n_sample_curves:
+                sample_equity_curves.append(curve)
             
             # Store results
             max_drawdowns[i] = max_dd
@@ -180,7 +203,11 @@ class MonteCarloSimulator:
             # Raw distributions for potential charting
             'max_dd_distribution': max_drawdowns,
             'cagr_distribution': cagrs,
-            'losing_streak_distribution': max_losing_streaks
+            'losing_streak_distribution': max_losing_streaks,
+            
+            # Equity curves for visualization
+            'sample_equity_curves': sample_equity_curves,
+            'historical_equity_curve': historical_curve
         }
         
         return self.results
@@ -206,7 +233,9 @@ class MonteCarloSimulator:
             'initial_capital': self.initial_capital,
             'max_dd_distribution': np.array([]),
             'cagr_distribution': np.array([]),
-            'losing_streak_distribution': np.array([])
+            'losing_streak_distribution': np.array([]),
+            'sample_equity_curves': [],
+            'historical_equity_curve': []
         }
     
     def get_results(self) -> Dict:
