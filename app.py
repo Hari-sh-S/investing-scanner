@@ -152,11 +152,12 @@ main_tabs = st.tabs(["Backtest", "Backtest Logs", "Data Download"])
 
 # ==================== TAB 1: BACKTEST ====================
 with main_tabs[0]:
-    col_config, col_scoring, col_metrics = st.columns([1.2, 2, 1])
+    col_config, col_scoring = st.columns([1, 1.2])
     
     with col_config:
         st.subheader("Configuration")
         
+        # ===== BASIC SETTINGS (always visible) =====
         st.markdown("**Universe**")
         
         # Get all available universes
@@ -175,66 +176,70 @@ with main_tabs[0]:
             universe = get_universe(selected_universe)
             st.caption(f"{len(universe)} stocks")
         
-        st.markdown("**Capital & Size**")
-        initial_capital = st.number_input("Starting Capital (₹)", 10000, 100000000, 100000, 10000)
-        num_stocks = st.number_input("No. of Stocks in Portfolio*", 1, 50, 5)
-        exit_rank = st.number_input("Exit Rank*", num_stocks, 200, num_stocks * 2, 
-                                    help="Stocks will exit if they fall below this rank. Should be > Portfolio Size")
+        # Capital, Stocks, Exit Rank in compact rows
+        st.markdown("**Portfolio Settings**")
+        cap_col1, cap_col2 = st.columns(2)
+        with cap_col1:
+            initial_capital = st.number_input("Capital (₹)", 10000, 100000000, 100000, 10000)
+        with cap_col2:
+            num_stocks = st.number_input("Stocks", 1, 50, 5)
         
-        reinvest_profits = st.checkbox("Reinvest Profits", value=True,
-                                       help="If enabled, reinvest starting capital + profits. If disabled, only reinvest initial capital amount.")
+        exit_col1, exit_col2 = st.columns(2)
+        with exit_col1:
+            exit_rank = st.number_input("Exit Rank", num_stocks, 200, num_stocks * 2, 
+                                        help="Stocks exit if they fall below this rank")
+        with exit_col2:
+            reinvest_profits = st.checkbox("Reinvest Profits", value=True)
         
         use_historical_universe = st.checkbox("Historical Universe (Beta)", value=False,
-                                             help="Use point-in-time index constituents to avoid survivorship bias. "
-                                                  "Only uses stocks that were in the index at each rebalance date.")
+                                             help="Use point-in-time index constituents to avoid survivorship bias")
         
-        st.markdown("**Time Period**")
-        start_date = st.date_input("Start Date", datetime.date(2020, 1, 1))
-        end_date = st.date_input("End Date", datetime.date.today())
+        # ===== TIME PERIOD & REBALANCING (in expander) =====
+        with st.expander("📅 Time Period & Rebalancing", expanded=False):
+            date_col1, date_col2 = st.columns(2)
+            with date_col1:
+                start_date = st.date_input("Start Date", datetime.date(2020, 1, 1))
+            with date_col2:
+                end_date = st.date_input("End Date", datetime.date.today())
+            
+            rebal_freq_options = ["Weekly", "Monthly"]
+            rebalance_label = st.selectbox("Frequency", rebal_freq_options, index=1)
+            
+            if rebalance_label == "Weekly":
+                rebal_day = st.selectbox("Rebalance Day", ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"])
+                rebalance_date = None
+            else:  # Monthly
+                rebalance_date = st.number_input("Rebalance Date (1-30)", 1, 30, 1,
+                                                help="Day of month to rebalance portfolio")
+                rebal_day = None
+            
+            alt_day_option = st.selectbox("If Holiday", 
+                                         ["Previous Day", "Next Day"],
+                                         index=1,
+                                         help="If rebalance day is holiday, use this option")
         
-        st.markdown("**Rebalancing**")
-        rebal_freq_options = ["Weekly", "Monthly"]
-        rebalance_label = st.selectbox("Frequency", rebal_freq_options, index=1)
-        
-        if rebalance_label == "Weekly":
-            rebal_day = st.selectbox("Rebalance Day", ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"])
-            rebalance_date = None
-        else:  # Monthly
-            rebalance_date = st.number_input("Rebalance Date (1-30)", 1, 30, 1,
-                                            help="Day of month to rebalance portfolio")
-            rebal_day = None
-        
-        alt_day_option = st.selectbox("Alternative Rebalance Day", 
-                                     ["Previous Day", "Next Day"],
-                                     index=1,
-                                     help="If rebalance day is holiday, use this option")
-        
-        st.markdown("**Position Sizing**")
-        position_sizing_method = st.selectbox(
-            "Sizing Method",
-            ["Equal Weight", "Inverse Volatility", "Score-Weighted", "Risk Parity"],
-            index=0,
-            help="""
-            Equal Weight: Divide capital equally among all stocks
-            Inverse Volatility: Allocate more to lower volatility stocks
-            Score-Weighted: Allocate more to higher scoring stocks
-            Risk Parity: Equal risk contribution from each stock
-            """
-        )
-        
-        use_max_position_cap = st.checkbox(
-            "Apply Max Position Cap",
-            value=False,
-            help="Limit maximum allocation to any single stock (recommended with vol-based methods)"
-        )
-        
-        max_position_pct = 15  # Default
-        if use_max_position_cap:
-            max_position_pct = st.number_input(
-                "Max Position %",
-                5, 50, 15,
-                help="Maximum % of portfolio any single stock can hold"
+        # ===== POSITION SIZING (in expander) =====
+        with st.expander("📊 Position Sizing", expanded=False):
+            position_sizing_method = st.selectbox(
+                "Sizing Method",
+                ["Equal Weight", "Inverse Volatility", "Score-Weighted", "Risk Parity"],
+                index=0,
+                help="Equal Weight: Divide equally | Inverse Volatility: More to lower vol | Score-Weighted: More to higher scores | Risk Parity: Equal risk contribution"
             )
+            
+            use_max_position_cap = st.checkbox(
+                "Apply Max Position Cap",
+                value=False,
+                help="Limit maximum allocation to any single stock"
+            )
+            
+            max_position_pct = 15  # Default
+            if use_max_position_cap:
+                max_position_pct = st.number_input(
+                    "Max Position %",
+                    5, 50, 15,
+                    help="Maximum % of portfolio any single stock can hold"
+                )
         
         # Create position sizing config
         position_sizing_config = {
@@ -243,82 +248,84 @@ with main_tabs[0]:
             'max_pct': max_position_pct
         }
         
-        
-        st.markdown("**Regime Filter**")
-        use_regime_filter = st.checkbox("Enable Regime Filter", value=False)
-        
-        regime_config = None
-        if use_regime_filter:
-            regime_type = st.selectbox("Regime Filter Type", 
-                                      ["EMA", "MACD", "SUPERTREND", "EQUITY", "EQUITY_MA"],
-                                      help="EQUITY_MA: Uses moving average of your equity curve (meta-strategy)")
+        # ===== REGIME FILTER (in expander) =====
+        with st.expander("🛡️ Regime Filter", expanded=False):
+            use_regime_filter = st.checkbox("Enable Regime Filter", value=False)
             
-            # Initialize defaults
-            recovery_dd = None
-            ma_period = None
-            
-            if regime_type == "EMA":
-                ema_period = st.selectbox("EMA Period", [34, 68, 100, 150, 200])
-                regime_value = ema_period
-            elif regime_type == "MACD":
-                macd_preset = st.selectbox("MACD Settings", 
-                                          ["35-70-12", "50-100-15", "75-150-12"])
-                regime_value = macd_preset
-            elif regime_type == "SUPERTREND":
-                st_preset = st.selectbox("SuperTrend (Period-Multiplier)", 
-                                        ["1-1", "1-2", "1-2.5"])
-                regime_value = st_preset
-            elif regime_type == "EQUITY":
-                realized_sl = st.number_input("Drawdown SL % (Trigger)", 1, 50, 10,
-                                              help="Sell all holdings when drawdown from peak equity exceeds this %")
-                recovery_dd = st.number_input("Recovery DD % (Re-entry)", 0, 49, 5,
-                                              help="Only re-enter market when drawdown recovers below this %. Should be less than Trigger % to avoid whipsaw.")
-                regime_value = realized_sl
-            else:  # EQUITY_MA
-                ma_period = st.selectbox("Equity Curve MA Period (days)", 
-                                        [20, 30, 50, 100, 200],
-                                        index=2,  # Default to 50
-                                        help="Reduce exposure when portfolio equity falls below this MA")
-                regime_value = ma_period
-            
-            # Regime action - now available for ALL types including EQUITY
-            regime_action = st.selectbox("Regime Filter Action",
-                                        ["Go Cash", "Half Portfolio"],
-                                        help="Action to take when regime filter triggers")
-            
-            # Index selection for regime filter - only for non-EQUITY and non-EQUITY_MA types
-            if regime_type not in ["EQUITY", "EQUITY_MA"]:
-                regime_index = st.selectbox("Regime Filter Index", sorted(get_all_universe_names()))
-            else:
-                regime_index = None
-            
-            regime_config = {
-                'type': regime_type,
-                'value': regime_value,
-                'action': regime_action,
-                'index': regime_index,
-                'recovery_dd': recovery_dd,  # Recovery threshold for EQUITY regime
-                'ma_period': ma_period if regime_type == "EQUITY_MA" else None  # MA period for EQUITY_MA
-            }
-            
-            # Uncorrelated Asset - ONLY when regime filter is enabled
-            st.markdown("**Uncorrelated Asset**")
-            use_uncorrelated = st.checkbox("Invest in Uncorrelated Asset", value=False,
-                                          help="Allocate to uncorrelated asset when regime filter triggers")
-            
-            uncorrelated_config = None
-            if use_uncorrelated:
-                asset_type = st.text_input("Asset Type", "GOLDBEES",
-                                          help="Enter ticker symbol (e.g., GOLDBEES for Gold)")
-                allocation_pct = st.number_input("Allocation %", 1, 100, 20,
-                                                help="% of portfolio value to allocate when regime triggers")
+            regime_config = None
+            if use_regime_filter:
+                regime_type = st.selectbox("Regime Filter Type", 
+                                          ["EMA", "MACD", "SUPERTREND", "EQUITY", "EQUITY_MA"],
+                                          help="EQUITY_MA: Uses moving average of your equity curve")
                 
-                uncorrelated_config = {
-                    'asset': asset_type,
-                    'allocation_pct': allocation_pct
+                # Initialize defaults
+                recovery_dd = None
+                ma_period = None
+                
+                if regime_type == "EMA":
+                    ema_period = st.selectbox("EMA Period", [34, 68, 100, 150, 200])
+                    regime_value = ema_period
+                elif regime_type == "MACD":
+                    macd_preset = st.selectbox("MACD Settings", 
+                                              ["35-70-12", "50-100-15", "75-150-12"])
+                    regime_value = macd_preset
+                elif regime_type == "SUPERTREND":
+                    st_preset = st.selectbox("SuperTrend (Period-Multiplier)", 
+                                            ["1-1", "1-2", "1-2.5"])
+                    regime_value = st_preset
+                elif regime_type == "EQUITY":
+                    eq_col1, eq_col2 = st.columns(2)
+                    with eq_col1:
+                        realized_sl = st.number_input("DD SL % (Trigger)", 1, 50, 10,
+                                                      help="Sell when drawdown exceeds this %")
+                    with eq_col2:
+                        recovery_dd = st.number_input("Recovery DD %", 0, 49, 5,
+                                                      help="Re-enter when drawdown below this %")
+                    regime_value = realized_sl
+                else:  # EQUITY_MA
+                    ma_period = st.selectbox("Equity Curve MA Period", 
+                                            [20, 30, 50, 100, 200],
+                                            index=2,
+                                            help="Reduce exposure when equity falls below this MA")
+                    regime_value = ma_period
+                
+                regime_action = st.selectbox("Regime Filter Action",
+                                            ["Go Cash", "Half Portfolio"],
+                                            help="Action when regime filter triggers")
+                
+                if regime_type not in ["EQUITY", "EQUITY_MA"]:
+                    regime_index = st.selectbox("Regime Filter Index", sorted(get_all_universe_names()))
+                else:
+                    regime_index = None
+                
+                regime_config = {
+                    'type': regime_type,
+                    'value': regime_value,
+                    'action': regime_action,
+                    'index': regime_index,
+                    'recovery_dd': recovery_dd,
+                    'ma_period': ma_period if regime_type == "EQUITY_MA" else None
                 }
-        else:
-            uncorrelated_config = None
+                
+                # Uncorrelated Asset
+                st.markdown("---")
+                use_uncorrelated = st.checkbox("Invest in Uncorrelated Asset", value=False,
+                                              help="Allocate to uncorrelated asset when regime triggers")
+                
+                uncorrelated_config = None
+                if use_uncorrelated:
+                    unc_col1, unc_col2 = st.columns(2)
+                    with unc_col1:
+                        asset_type = st.text_input("Asset Ticker", "GOLDBEES")
+                    with unc_col2:
+                        allocation_pct = st.number_input("Alloc %", 1, 100, 20)
+                    
+                    uncorrelated_config = {
+                        'asset': asset_type,
+                        'allocation_pct': allocation_pct
+                    }
+            else:
+                uncorrelated_config = None
     
     with col_scoring:
         st.subheader("Scoring Console")
@@ -329,7 +336,7 @@ with main_tabs[0]:
         template = st.selectbox("Template", ["Custom"] + list(examples.keys()))
         default = examples.get(template, "6 Month Performance")
         
-        formula = st.text_area("Scoring Formula", default, height=120)
+        formula = st.text_area("Scoring Formula", default, height=100)
         
         valid, msg = parser.validate_formula(formula)
         if valid:
@@ -337,38 +344,39 @@ with main_tabs[0]:
         else:
             st.error("❌ " + msg)
         
+        # Compact metrics reference in collapsible expander
+        with st.expander("📖 Available Metrics", expanded=False):
+            metric_groups = parser.metric_groups if hasattr(parser, 'metric_groups') else {}
+            
+            # Display metrics in a compact multi-column format
+            metrics_text = []
+            
+            perf = metric_groups.get('Performance', ["1 Month Performance", "3 Month Performance", "6 Month Performance", "12 Month Performance"])
+            metrics_text.append("**Performance:** " + " • ".join(perf))
+            
+            vol = metric_groups.get('Volatility', ["1 Month Volatility", "3 Month Volatility", "6 Month Volatility"])
+            metrics_text.append("**Volatility:** " + " • ".join(vol))
+            
+            dsv = metric_groups.get('Downside Volatility', [])
+            if dsv:
+                metrics_text.append("**Downside Vol:** " + " • ".join(dsv))
+            
+            mdd = metric_groups.get('Max Drawdown', [])
+            if mdd:
+                metrics_text.append("**Max Drawdown:** " + " • ".join(mdd))
+            
+            sharpe = metric_groups.get('Sharpe Ratio', ["6 Month Sharpe"])
+            sortino = metric_groups.get('Sortino Ratio', ["6 Month Sortino"])
+            calmar = metric_groups.get('Calmar Ratio', ["6 Month Calmar"])
+            risk_adj = sharpe + sortino + calmar
+            if risk_adj:
+                metrics_text.append("**Risk-Adjusted:** " + " • ".join(risk_adj))
+            
+            for text in metrics_text:
+                st.markdown(text, unsafe_allow_html=True)
+        
         st.markdown("---")
-        run_btn = st.button("🚀 Run Backtest", type="primary")
-    
-    with col_metrics:
-        st.subheader("Metrics")
-        
-        # Get metric groups from parser
-        metric_groups = parser.metric_groups if hasattr(parser, 'metric_groups') else {}
-        
-        st.markdown("**Performance**")
-        for m in metric_groups.get('Performance', ["1 Month Performance", "3 Month Performance", "6 Month Performance"]):
-            st.caption(m)
-        
-        st.markdown("**Volatility**")
-        for m in metric_groups.get('Volatility', ["1 Month Volatility", "3 Month Volatility", "6 Month Volatility"]):
-            st.caption(m)
-        
-        st.markdown("**Downside Volatility**")
-        for m in metric_groups.get('Downside Volatility', []):
-            st.caption(m)
-        
-        st.markdown("**Max Drawdown**")
-        for m in metric_groups.get('Max Drawdown', []):
-            st.caption(m)
-        
-        st.markdown("**Risk-Adjusted**")
-        for m in metric_groups.get('Sharpe Ratio', ["6 Month Sharpe"]):
-            st.caption(m)
-        for m in metric_groups.get('Sortino Ratio', ["6 Month Sortino"]):
-            st.caption(m)
-        for m in metric_groups.get('Calmar Ratio', ["6 Month Calmar"]):
-            st.caption(m)
+        run_btn = st.button("🚀 Run Backtest", type="primary", use_container_width=True)
     
     # Results Section
     if run_btn:
