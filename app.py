@@ -889,7 +889,7 @@ with main_tabs[0]:
                                                 x=list(range(len(curve))),
                                                 y=curve,
                                                 mode='lines',
-                                                line=dict(color='rgba(150, 150, 150, 0.15)', width=1),
+                                                line=dict(color='rgba(150, 150, 150, 0.3)', width=1),
                                                 showlegend=False,
                                                 hoverinfo='skip'
                                             ))
@@ -906,7 +906,6 @@ with main_tabs[0]:
                                             ))
                                         
                                         # Add starting capital line
-                                        n_trades = len(historical_curve) if historical_curve else len(sample_curves[0])
                                         fig_mc.add_hline(
                                             y=mc_results['initial_capital'],
                                             line_dash="dash",
@@ -923,6 +922,8 @@ with main_tabs[0]:
                                             legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
                                         )
                                         st.plotly_chart(fig_mc, use_container_width=True)
+                                    else:
+                                        st.info(f"Chart data not available. Curves: {len(sample_curves) if sample_curves else 0}, Historical: {len(historical_curve) if historical_curve else 0}")
                                 else:
                                     st.warning(f"Need at least 10 completed trades for Monte Carlo analysis. Currently have {len(trade_pnls)} trades.")
                             else:
