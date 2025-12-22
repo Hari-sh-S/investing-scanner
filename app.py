@@ -526,25 +526,28 @@ with main_tabs[0]:
                                 mime="application/pdf"
                             )
                         
-                        # Result tabs - add Equity Regime Testing tab if EQUITY filter is used
+                        # Result tabs - add regime-specific tabs based on filter type
                         equity_analysis = None
                         if hasattr(engine, 'get_equity_regime_analysis'):
                             equity_analysis = engine.get_equity_regime_analysis()
                         
-                        
-                        
                         # Build tab list dynamically
                         tab_names = ["Performance Metrics", "Charts", "Monthly Breakup", "Monthly Report", "Trade History"]
-                        if equity_analysis:
+                        
+                        # Check specific regime filter types
+                        is_equity = regime_config and regime_config.get('type') == 'EQUITY'
+                        is_equity_ma = regime_config and regime_config.get('type') == 'EQUITY_MA'
+                        is_other_regime = regime_config and regime_config.get('type') in ['EMA', 'MACD', 'SUPERTREND']
+                        
+                        # Equity Regime Testing tab - only for EQUITY filter
+                        if is_equity and equity_analysis:
                             tab_names.append("Equity Regime Testing")
                         
-                        # Check if EQUITY_MA filter is used
-                        is_equity_ma = regime_config and regime_config.get('type') == 'EQUITY_MA'
+                        # Equity MA Testing tab - only for EQUITY_MA filter
                         if is_equity_ma:
                             tab_names.append("Equity MA Testing")
                         
-                        # Check if other regime filters (EMA, MACD, SUPERTREND) are used - add analysis tab
-                        is_other_regime = regime_config and regime_config.get('type') in ['EMA', 'MACD', 'SUPERTREND']
+                        # Regime Filter Analysis tab - for EMA, MACD, SUPERTREND filters
                         if is_other_regime and equity_analysis:
                             tab_names.append("Regime Filter Analysis")
                         

@@ -235,28 +235,70 @@ def create_excel_with_charts(config, metrics, engine=None):
     
     if engine and hasattr(engine, 'trades_df') and not engine.trades_df.empty:
         trades_df = engine.trades_df.copy()
-        if 'Date' in trades_df.columns:
-            trades_df['Date'] = pd.to_datetime(trades_df['Date']).dt.strftime('%Y-%m-%d')
         
-        # Write headers
-        headers = list(trades_df.columns)
-        for col_idx, header in enumerate(headers, 1):
-            cell = ws_trades.cell(row=1, column=col_idx, value=header)
-            cell.fill = header_fill
-            cell.font = header_font
-            cell.border = thin_border
+        # Create consolidated trade view matching BUY with SELL (same format as web app)
+        buy_trades = trades_df[trades_df['Action'] == 'BUY'].copy()
+        sell_trades = trades_df[trades_df['Action'] == 'SELL'].copy()
         
-        # Write data
-        for row_idx, (_, row) in enumerate(trades_df.iterrows(), 2):
-            for col_idx, value in enumerate(row, 1):
-                cell = ws_trades.cell(row=row_idx, column=col_idx, value=value)
+        consolidated_trades = []
+        
+        for _, sell in sell_trades.iterrows():
+            ticker = sell['Ticker']
+            sell_date = sell['Date']
+            
+            # Find the most recent BUY for this ticker before this SELL
+            prev_buys = buy_trades[
+                (buy_trades['Ticker'] == ticker) & 
+                (buy_trades['Date'] < sell_date)
+            ]
+            
+            if not prev_buys.empty:
+                buy = prev_buys.iloc[-1]
+                buy_price = float(buy['Price'])
+                sell_price = float(sell['Price'])
+                shares = int(buy['Shares'])
+                roi = ((sell_price - buy_price) / buy_price) * 100
+                
+                consolidated_trades.append({
+                    'Stock': ticker.replace('.NS', ''),
+                    'Buy Date': pd.to_datetime(buy['Date']).strftime('%Y-%m-%d'),
+                    'Buy Price': round(buy_price, 2),
+                    'Exit Date': pd.to_datetime(sell_date).strftime('%Y-%m-%d'),
+                    'Exit Price': round(sell_price, 2),
+                    'Shares': shares,
+                    'ROI %': round(roi, 2)
+                })
+        
+        if consolidated_trades:
+            # Write headers
+            headers = ['Stock', 'Buy Date', 'Buy Price', 'Exit Date', 'Exit Price', 'Shares', 'ROI %']
+            for col_idx, header in enumerate(headers, 1):
+                cell = ws_trades.cell(row=1, column=col_idx, value=header)
+                cell.fill = header_fill
+                cell.font = header_font
                 cell.border = thin_border
-                # Color BUY/SELL cells
-                if col_idx == 3:  # Action column
-                    if value == 'BUY':
-                        cell.fill = positive_fill
-                    elif value == 'SELL':
-                        cell.fill = negative_fill
+            
+            # Write data
+            for row_idx, trade in enumerate(consolidated_trades, 2):
+                for col_idx, header in enumerate(headers, 1):
+                    value = trade[header]
+                    cell = ws_trades.cell(row=row_idx, column=col_idx, value=value)
+                    cell.border = thin_border
+                    # Color ROI % column (column 7)
+                    if col_idx == 7:  # ROI % column
+                        if value > 0:
+                            cell.fill = positive_fill
+                        elif value < 0:
+                            cell.fill = negative_fill
+            
+            # Set column widths for better readability
+            ws_trades.column_dimensions['A'].width = 15  # Stock
+            ws_trades.column_dimensions['B'].width = 12  # Buy Date
+            ws_trades.column_dimensions['C'].width = 12  # Buy Price
+            ws_trades.column_dimensions['D'].width = 12  # Exit Date
+            ws_trades.column_dimensions['E'].width = 12  # Exit Price
+            ws_trades.column_dimensions['F'].width = 10  # Shares
+            ws_trades.column_dimensions['G'].width = 10  # ROI %
     
     wb.save(output)
     output.seek(0)
