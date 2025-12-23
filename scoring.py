@@ -133,8 +133,10 @@ class ScoreParser:
         # Replace percentages (e.g., 80% -> 0.80)
         processed = re.sub(r'(\d+(\.\d+)?)%', r'(\1/100)', processed)
         
-        # Replace operators
-        processed = processed.replace('x', '*').replace('×', '*')
+        # Replace operators (only standalone x, not x within words like 'Max')
+        # Use word boundary to match 'x' only when it's between numbers/spaces
+        processed = re.sub(r'(?<=[\d\s\)])x(?=[\d\s\(])', '*', processed)
+        processed = processed.replace('×', '*')
         processed = processed.replace('÷', '/')
         
         return processed
