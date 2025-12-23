@@ -66,10 +66,15 @@ class IndicatorLibrary:
         return df
 
     @staticmethod
-    def add_momentum_volatility_metrics(df):
+    def add_momentum_volatility_metrics(df, required_periods=None):
         """
         FAST vectorized Performance and Risk metrics for multiple timeframes.
         Uses pure NumPy operations for maximum speed.
+        
+        Args:
+            df: DataFrame with OHLCV data
+            required_periods: Optional set of (months, metric_type) tuples.
+                             If None, calculates default periods (1, 3, 6, 9, 12 months)
         """
         if isinstance(df, pd.Series):
             raise ValueError("Input must be a DataFrame, not a Series")
@@ -78,46 +83,75 @@ class IndicatorLibrary:
             raise ValueError("DataFrame must have a 'Close' column")
         
         close = df['Close'].squeeze() if isinstance(df['Close'], pd.DataFrame) else df['Close']
-        close_vals = close.values
         
-        periods = {'1 Month': 21, '3 Month': 63, '6 Month': 126, '9 Month': 189, '1 Year': 252}
+        # Default periods (in months) - always calculate these for compatibility
+        default_months = {1, 3, 6, 9, 12}
+        
+        # Add any additional required periods
+        if required_periods:
+            for months, _ in required_periods:
+                default_months.add(months)
+        
+        # Convert months to trading days (approx 21 days/month)
+        periods = {}
+        for months in sorted(default_months):
+            name = '1 Year' if months == 12 else f'{months} Month'
+            window = months * 21  # ~21 trading days per month
+            periods[name] = window
         
         # Pre-calculate returns once 
         daily_returns = close.pct_change()
-        df['Daily_Returns'] = daily_returns
-        returns_vals = daily_returns.values
+        if 'Daily_Returns' not in df.columns:
+            df['Daily_Returns'] = daily_returns
         
         for name, window in periods.items():
             # 1. Performance - vectorized
-            df[f'{name} Performance'] = close.pct_change(periods=window)
+            col_name = f'{name} Performance'
+            if col_name not in df.columns:
+                df[col_name] = close.pct_change(periods=window)
             
             # 2. Volatility - vectorized
-            df[f'{name} Volatility'] = daily_returns.rolling(window).std() * np.sqrt(252)
+            col_name = f'{name} Volatility'
+            if col_name not in df.columns:
+                df[col_name] = daily_returns.rolling(window).std() * np.sqrt(252)
             
             # 2b. Downside Volatility - only negative returns
-            downside = daily_returns.clip(upper=0)
-            df[f'{name} Downside Volatility'] = downside.rolling(window).std() * np.sqrt(252)
+            col_name = f'{name} Downside Volatility'
+            if col_name not in df.columns:
+                downside = daily_returns.clip(upper=0)
+                df[col_name] = downside.rolling(window).std() * np.sqrt(252)
             
             # 3. Max Drawdown - vectorized
-            rolling_max = close.rolling(window).max()
-            drawdown = (close - rolling_max) / rolling_max
-            df[f'{name} Max Drawdown'] = drawdown.rolling(window).min()
+            col_name = f'{name} Max Drawdown'
+            if col_name not in df.columns:
+                rolling_max = close.rolling(window).max()
+                drawdown = (close - rolling_max) / rolling_max
+                df[col_name] = drawdown.rolling(window).min()
             
             # 4. Sharpe - vectorized
-            mean_ret = daily_returns.rolling(window).mean()
-            std_ret = daily_returns.rolling(window).std()
-            sharpe = (mean_ret / std_ret) * np.sqrt(252)
-            df[f'{name} Sharpe'] = sharpe.replace([np.inf, -np.inf], 0)
+            col_name = f'{name} Sharpe'
+            if col_name not in df.columns:
+                mean_ret = daily_returns.rolling(window).mean()
+                std_ret = daily_returns.rolling(window).std()
+                sharpe = (mean_ret / std_ret) * np.sqrt(252)
+                df[col_name] = sharpe.replace([np.inf, -np.inf], 0)
             
-            # 5. Sortino - vectorized (simplified for speed)
-            downside = daily_returns.clip(upper=0)
-            downside_std = downside.rolling(window).std()
-            sortino = (mean_ret / downside_std) * np.sqrt(252)
-            df[f'{name} Sortino'] = sortino.replace([np.inf, -np.inf], 0)
+            # 5. Sortino - vectorized
+            col_name = f'{name} Sortino'
+            if col_name not in df.columns:
+                downside = daily_returns.clip(upper=0)
+                mean_ret = daily_returns.rolling(window).mean()
+                downside_std = downside.rolling(window).std()
+                sortino = (mean_ret / downside_std) * np.sqrt(252)
+                df[col_name] = sortino.replace([np.inf, -np.inf], 0)
             
             # 6. Calmar - vectorized
-            calmar = df[f'{name} Performance'] / df[f'{name} Max Drawdown'].abs()
-            df[f'{name} Calmar'] = calmar.replace([np.inf, -np.inf], 0)
+            col_name = f'{name} Calmar'
+            if col_name not in df.columns:
+                perf_col = f'{name} Performance'
+                dd_col = f'{name} Max Drawdown'
+                calmar = df[perf_col] / df[dd_col].abs()
+                df[col_name] = calmar.replace([np.inf, -np.inf], 0)
         
         df.fillna(0, inplace=True)
         return df

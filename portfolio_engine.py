@@ -367,7 +367,15 @@ class PortfolioEngine:
         if not needs_momentum and not needs_regime:
             return  # No indicators needed
         
-        print(f"Calculating indicators (momentum={needs_momentum}, regime={needs_regime})...")
+        # Extract required periods from formula (e.g., "15 Month Performance" -> (15, 'Performance'))
+        required_periods = None
+        if needs_momentum:
+            from scoring import ScoreParser
+            parser = ScoreParser()
+            required_periods = parser.extract_required_periods(formula)
+            print(f"Calculating indicators (momentum={needs_momentum}, regime={needs_regime}, periods={required_periods})...")
+        else:
+            print(f"Calculating indicators (momentum={needs_momentum}, regime={needs_regime})...")
         
         for ticker in self.data:
             try:
@@ -381,7 +389,11 @@ class PortfolioEngine:
                 
                 # Only calculate if not already calculated
                 if needs_momentum and '6 Month Performance' not in df.columns:
-                    df = IndicatorLibrary.add_momentum_volatility_metrics(df)
+                    df = IndicatorLibrary.add_momentum_volatility_metrics(df, required_periods)
+                elif needs_momentum and required_periods:
+                    # Check if any required periods are missing and add them
+                    df = IndicatorLibrary.add_momentum_volatility_metrics(df, required_periods)
+                    
                 if needs_regime and 'EMA_200' not in df.columns:
                     df = IndicatorLibrary.add_regime_filters(df)
                 

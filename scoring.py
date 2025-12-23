@@ -4,32 +4,49 @@ import numpy as np
 
 class ScoreParser:
     def __init__(self):
-        # Expanded metrics list with all new additions
-        self.allowed_metrics = [
-            # Performance
-            '1 Month Performance', '3 Month Performance', '6 Month Performance', 
-            '9 Month Performance', '1 Year Performance',
-            # Volatility
-            '1 Month Volatility', '3 Month Volatility', '6 Month Volatility', 
-            '9 Month Volatility', '1 Year Volatility',
-            # Downside Volatility (negative returns only)
-            '1 Month Downside Volatility', '3 Month Downside Volatility', '6 Month Downside Volatility',
-            '9 Month Downside Volatility', '1 Year Downside Volatility',
-            # Max Drawdown
-            '1 Month Max Drawdown', '3 Month Max Drawdown', '6 Month Max Drawdown',
-            '9 Month Max Drawdown', '1 Year Max Drawdown',
-            # Sharpe Ratio
-            '1 Month Sharpe', '3 Month Sharpe', '6 Month Sharpe',
-            '9 Month Sharpe', '1 Year Sharpe',
-            # Sortino Ratio
-            '1 Month Sortino', '3 Month Sortino', '6 Month Sortino',
-            '9 Month Sortino', '1 Year Sortino',
-            # Calmar Ratio
-            '1 Month Calmar', '3 Month Calmar', '6 Month Calmar',
-            '9 Month Calmar', '1 Year Calmar',
+        # Metric types that support dynamic month values (1-24 months)
+        self.metric_types = [
+            'Performance', 'Volatility', 'Downside Volatility',
+            'Max Drawdown', 'Sharpe', 'Sortino', 'Calmar'
         ]
         
+        # Pattern to match dynamic metrics like "15 Month Performance" or "1 Year Performance"
+        # Supports: "N Month MetricType" where N is 1-24, or "1 Year MetricType"
+        self.metric_pattern = re.compile(
+            r'(\d{1,2})\s+Month\s+(Performance|Volatility|Downside Volatility|Max Drawdown|Sharpe|Sortino|Calmar)|'
+            r'1\s+Year\s+(Performance|Volatility|Downside Volatility|Max Drawdown|Sharpe|Sortino|Calmar)',
+            re.IGNORECASE
+        )
+        
+        # Common examples for UI display (not exhaustive)
+        self.example_periods = [1, 3, 6, 9, 12]
+        
+        # Build example metrics for UI (subset of all possible)
+        self.allowed_metrics = []
+        for period in self.example_periods:
+            period_name = '1 Year' if period == 12 else f'{period} Month'
+            for metric_type in self.metric_types:
+                self.allowed_metrics.append(f'{period_name} {metric_type}')
+        
         # Create metric groups for UI display
+        self.metric_groups = {
+            'Performance': [f'{p if p != 12 else "1 Year"} {"Month" if p != 12 else ""} Performance'.replace("  ", " ").strip() 
+                          for p in self.example_periods],
+            'Volatility': [f'{p if p != 12 else "1 Year"} {"Month" if p != 12 else ""} Volatility'.replace("  ", " ").strip()
+                         for p in self.example_periods],
+            'Downside Volatility': [f'{p if p != 12 else "1 Year"} {"Month" if p != 12 else ""} Downside Volatility'.replace("  ", " ").strip()
+                                   for p in self.example_periods],
+            'Max Drawdown': [f'{p if p != 12 else "1 Year"} {"Month" if p != 12 else ""} Max Drawdown'.replace("  ", " ").strip()
+                           for p in self.example_periods],
+            'Sharpe Ratio': [f'{p if p != 12 else "1 Year"} {"Month" if p != 12 else ""} Sharpe'.replace("  ", " ").strip()
+                           for p in self.example_periods],
+            'Sortino Ratio': [f'{p if p != 12 else "1 Year"} {"Month" if p != 12 else ""} Sortino'.replace("  ", " ").strip()
+                            for p in self.example_periods],
+            'Calmar Ratio': [f'{p if p != 12 else "1 Year"} {"Month" if p != 12 else ""} Calmar'.replace("  ", " ").strip()
+                           for p in self.example_periods],
+        }
+        
+        # Fix the metric groups formatting
         self.metric_groups = {
             'Performance': ['1 Month Performance', '3 Month Performance', '6 Month Performance', 
                           '9 Month Performance', '1 Year Performance'],
@@ -47,6 +64,24 @@ class ScoreParser:
             'Calmar Ratio': ['1 Month Calmar', '3 Month Calmar', '6 Month Calmar',
                            '9 Month Calmar', '1 Year Calmar'],
         }
+    
+    def extract_required_periods(self, formula):
+        """Extract all month periods required by the formula.
+        Returns a set of (months, metric_type) tuples."""
+        required = set()
+        
+        # Find all matches in the formula
+        for match in self.metric_pattern.finditer(formula):
+            if match.group(1):  # N Month pattern
+                months = int(match.group(1))
+                metric_type = match.group(2)
+                if 1 <= months <= 24:
+                    required.add((months, metric_type))
+            elif match.group(3):  # 1 Year pattern
+                metric_type = match.group(3)
+                required.add((12, metric_type))
+        
+        return required
 
     def validate_formula(self, formula):
         """
@@ -63,19 +98,20 @@ class ScoreParser:
         # Preprocess
         processed = self._preprocess_formula(formula)
         
-        # Replace all known metrics with (1) for testing
-        # Sort by length (longest first) to avoid partial replacements
-        test_formula = processed
-        for metric in sorted(self.allowed_metrics, key=len, reverse=True):
-            # Use exact replacement to avoid issues
-            if metric in test_formula:
-                test_formula = test_formula.replace(metric, "(1)")
+        # Replace all valid metric patterns with (1) for testing
+        test_formula = self.metric_pattern.sub('(1)', processed)
         
         # Check if only valid characters remain
-        # Remove all numbers, operators, parentheses, and spaces
         test_clean = re.sub(r'[\d\.\+\-\*\/\(\)\s]', '', test_formula)
         if test_clean:
             return False, f"Unknown: {test_clean[:15]}"
+        
+        # Validate month ranges
+        for match in self.metric_pattern.finditer(formula):
+            if match.group(1):  # N Month pattern
+                months = int(match.group(1))
+                if months < 1 or months > 24:
+                    return False, f"Invalid period: {months} months (use 1-24)"
         
         # Try to evaluate with dummy values to check syntax
         try:
@@ -84,7 +120,6 @@ class ScoreParser:
                 return False, "Returns None"
             return True, "Valid"
         except ZeroDivisionError:
-            # Division by zero is okay during validation
             return True, "Valid"
         except SyntaxError as e:
             return False, f"Syntax error"
@@ -111,22 +146,32 @@ class ScoreParser:
         """
         processed_formula = self._preprocess_formula(formula)
         
-        # Replace metrics with values from row
-        for metric in sorted(self.allowed_metrics, key=len, reverse=True):  # Longest first
-            if metric in processed_formula:
-                val = row.get(metric, 0)
-                
-                # Handle Series case (convert to scalar)
-                if isinstance(val, pd.Series):
-                    val = val.iloc[0] if len(val) > 0 else 0
-                
-                # Handle NaN and inf
-                if pd.isna(val):
-                    val = 0
-                elif np.isinf(val):
-                    val = 0
-                    
-                processed_formula = processed_formula.replace(metric, str(val))
+        # Function to replace metric with value from row
+        def replace_metric(match):
+            if match.group(1):  # N Month pattern
+                months = int(match.group(1))
+                metric_type = match.group(2)
+                metric_name = f'{months} Month {metric_type}'
+            else:  # 1 Year pattern
+                metric_type = match.group(3)
+                metric_name = f'1 Year {metric_type}'
+            
+            val = row.get(metric_name, 0)
+            
+            # Handle Series case
+            if isinstance(val, pd.Series):
+                val = val.iloc[0] if len(val) > 0 else 0
+            
+            # Handle NaN and inf
+            if pd.isna(val):
+                val = 0
+            elif np.isinf(val):
+                val = 0
+            
+            return str(val)
+        
+        # Replace all metrics using regex
+        processed_formula = self.metric_pattern.sub(replace_metric, processed_formula)
         
         # Final safety check
         if not re.match(r'^[\d\.\+\-\*\/\(\)\s]+$', processed_formula):
