@@ -416,9 +416,30 @@ class PortfolioEngine:
             target_day = day_map[rebal_config['day']]
             
             rebalance_dates = [d for d in all_dates if d.weekday() == target_day]
-        else:  # Monthly
+        
+        elif freq == 'Every 2 Weeks':
+            # Every 2 weeks on specified day
+            day_map = {'Monday': 0, 'Tuesday': 1, 'Wednesday': 2, 'Thursday': 3, 'Friday': 4}
+            target_day = day_map[rebal_config['day']]
+            
+            # Get all dates on target day
+            matching_dates = [d for d in all_dates if d.weekday() == target_day]
+            # Take every other one
+            rebalance_dates = matching_dates[::2]
+        
+        else:  # Monthly, Bi-Monthly, Quarterly, Half-Yearly, Annually
             target_date = rebal_config['date']
             alt_option = rebal_config.get('alt_day', 'Next Day')
+            
+            # Determine the skip interval (how many months between rebalances)
+            freq_to_skip = {
+                'Monthly': 1,
+                'Bi-Monthly': 2,
+                'Quarterly': 3,
+                'Half-Yearly': 6,
+                'Annually': 12
+            }
+            skip_months = freq_to_skip.get(freq, 1)
             
             rebalance_dates = []
             
@@ -430,9 +451,15 @@ class PortfolioEngine:
                     month_groups[key] = []
                 month_groups[key].append(date)
             
-            # For each month, find the best rebalance date
-            for (year, month), month_dates in month_groups.items():
-                month_dates_sorted = sorted(month_dates)
+            # Get sorted month keys
+            sorted_months = sorted(month_groups.keys())
+            
+            # Select months at the specified interval (starting from first available)
+            selected_months = sorted_months[::skip_months]
+            
+            # For each selected month, find the best rebalance date
+            for (year, month) in selected_months:
+                month_dates_sorted = sorted(month_groups[(year, month)])
                 rebalance_date = None
                 
                 # First, try to find exact target date
@@ -465,7 +492,7 @@ class PortfolioEngine:
                 if rebalance_date:
                     rebalance_dates.append(rebalance_date)
         
-        print(f"Generated {len(rebalance_dates)} rebalance dates from {len(all_dates)} trading days")
+        print(f"Generated {len(rebalance_dates)} rebalance dates from {len(all_dates)} trading days ({freq})")
         return sorted(rebalance_dates)
 
     def _check_regime_filter(self, date, regime_config, current_equity=0, peak_equity=0):

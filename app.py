@@ -140,13 +140,8 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Header
-col_title, col_actions = st.columns([3, 1])
-with col_title:
-    st.title("Investing Scanner")
-    st.caption("Advanced Backtesting for Indian Stock Market")
-
-st.markdown("---")
+# Header - compact
+st.markdown("### 📊 Investing Scanner")
 
 # Main Tabs
 main_tabs = st.tabs(["Backtest", "Backtest Logs", "Data Download"])
@@ -203,13 +198,16 @@ with main_tabs[0]:
             with date_col2:
                 end_date = st.date_input("End Date", datetime.date.today())
             
-            rebal_freq_options = ["Weekly", "Monthly"]
-            rebalance_label = st.selectbox("Frequency", rebal_freq_options, index=1)
+            rebal_freq_options = ["Weekly", "Every 2 Weeks", "Monthly", "Bi-Monthly", "Quarterly", "Half-Yearly", "Annually"]
+            rebalance_label = st.selectbox("Frequency", rebal_freq_options, index=2)
             
             if rebalance_label == "Weekly":
                 rebal_day = st.selectbox("Rebalance Day", ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"])
                 rebalance_date = None
-            else:  # Monthly
+            elif rebalance_label == "Every 2 Weeks":
+                rebal_day = st.selectbox("Rebalance Day", ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"])
+                rebalance_date = None
+            else:  # Monthly and above
                 rebalance_date = st.number_input("Rebalance Date (1-30)", 1, 30, 1,
                                                 help="Day of month to rebalance portfolio")
                 rebal_day = None
