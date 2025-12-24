@@ -315,9 +315,9 @@ with main_tabs[0]:
                 if use_uncorrelated:
                     unc_col1, unc_col2 = st.columns(2)
                     with unc_col1:
-                        asset_type = st.text_input("Asset Ticker", "GOLDBEES")
+                        asset_type = st.selectbox("Asset Ticker", ["GOLDBEES", "JUNIORBEES", "NIFTYBEES", "SILVERBEES"])
                     with unc_col2:
-                        allocation_pct = st.number_input("Alloc %", 1, 100, 20)
+                        allocation_pct = st.number_input("Alloc %", 1, 100, 100)
                     
                     uncorrelated_config = {
                         'asset': asset_type,
