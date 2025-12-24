@@ -77,10 +77,13 @@ class MonteCarloSimulator:
             'cagr': cagr
         }
     
-    def run_simulations(self) -> Dict:
+    def run_simulations(self, method: str = 'reshuffle') -> Dict:
         """
-        Run Monte Carlo simulations with trade reshuffling.
+        Run Monte Carlo simulations.
         
+        Args:
+            method: 'reshuffle' (permutation) or 'resample' (bootstrap with replacement)
+            
         Returns:
             Dictionary with simulation results and statistics
         """
@@ -110,8 +113,13 @@ class MonteCarloSimulator:
         
         # Run simulations
         for i in range(self.n_simulations):
-            # Shuffle trade PnLs
-            shuffled_pnls = np.random.permutation(self.trade_pnls)
+            # Generate PnL sequence based on method
+            if method == 'resample':
+                # Bootstrap sampling with replacement
+                sim_pnls = np.random.choice(self.trade_pnls, size=len(self.trade_pnls), replace=True)
+            else:
+                # Reshuffle (Permutation) without replacement
+                sim_pnls = np.random.permutation(self.trade_pnls)
             
             # Simulate equity curve
             equity = self.initial_capital
@@ -125,7 +133,7 @@ class MonteCarloSimulator:
             if i < n_sample_curves:
                 curve = [self.initial_capital]
             
-            for pnl in shuffled_pnls:
+            for pnl in sim_pnls:
                 equity += pnl
                 
                 # Store for sample curves
@@ -207,7 +215,11 @@ class MonteCarloSimulator:
             
             # Equity curves for visualization
             'sample_equity_curves': sample_equity_curves,
-            'historical_equity_curve': historical_curve
+            'historical_equity_curve': historical_curve,
+            
+            # Metadata
+            'method': method,
+            'method_name': "Reshuffle (Permutation)" if method == 'reshuffle' else "Resample (Bootstrap)"
         }
         
         return self.results
@@ -311,6 +323,15 @@ class MonteCarloSimulator:
             f"Median: {r['mc_cagr_median']:.1f}%. Historical: {r['historical_cagr']:.1f}%. "
             f"Spread of {cagr_range:.1f}% shows sequence-dependent performance."
         )
+        
+        # Add context about method
+        method_note = ""
+        if r.get('method') == 'resample':
+            method_note = " (Resampling allows worst-case scenarios to repeat, showing potentially more severe risks)"
+        elif r.get('method') == 'reshuffle':
+            method_note = " (Reshuffling rearranges existing trades, preserving the exact PnL set)"
+            
+        interpretations['method_note'] = method_note
         
         return interpretations
 
