@@ -84,19 +84,33 @@ class IndicatorLibrary:
         
         close = df['Close'].squeeze() if isinstance(df['Close'], pd.DataFrame) else df['Close']
         
-        # Default periods (in months) - always calculate these for compatibility
-        default_months = {1, 3, 6, 9, 12}
+        # Default periods (val, unit)
+        active_periods = {(1, 'Month'), (3, 'Month'), (6, 'Month'), (9, 'Month'), (12, 'Month')}
         
         # Add any additional required periods
         if required_periods:
-            for months, _ in required_periods:
-                default_months.add(months)
+            for item in required_periods:
+                # Handle legacy format (months, type) or new format (val, unit, type)
+                if len(item) == 3:
+                    val, unit, _ = item
+                    active_periods.add((val, unit))
+                elif len(item) == 2:
+                    val, _ = item
+                    active_periods.add((val, 'Month'))
         
-        # Convert months to trading days (approx 21 days/month)
+        # Convert periods to trading days
+        # Month ~ 21 days, Week ~ 5 days
         periods = {}
-        for months in sorted(default_months):
-            name = '1 Year' if months == 12 else f'{months} Month'
-            window = months * 21  # ~21 trading days per month
+        for val, unit in active_periods:
+            if unit == 'Month':
+                name = '1 Year' if val == 12 else f'{val} Month'
+                window = val * 21
+            elif unit == 'Week':
+                name = f'{val} Week'
+                window = val * 5
+            else:
+                continue
+                
             periods[name] = window
         
         # Pre-calculate returns once 

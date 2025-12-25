@@ -345,7 +345,7 @@ with main_tabs[0]:
         
         # Compact metrics reference in collapsible expander
         with st.expander("📖 Available Metrics", expanded=False):
-            st.caption("💡 **Tip:** Use any month from 1-24, e.g. `15 Month Performance` or `18 Month Sharpe`")
+            st.caption("💡 **Tip:** Use any month (1-24) or week (1-52), e.g. `15 Month Performance`, `2 Week Volatility` or `18 Month Sharpe`")
             
             metric_groups = parser.metric_groups if hasattr(parser, 'metric_groups') else {}
             

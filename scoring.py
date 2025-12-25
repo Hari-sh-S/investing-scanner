@@ -10,10 +10,11 @@ class ScoreParser:
             'Max Drawdown', 'Sharpe', 'Sortino', 'Calmar'
         ]
         
-        # Pattern to match dynamic metrics like "15 Month Performance" or "1 Year Performance"
-        # Supports: "N Month MetricType" where N is 1-24, or "1 Year MetricType"
+        # Pattern to match dynamic metrics like "15 Month Performance", "10 Week Performance" or "1 Year Performance"
+        # Supports: "N Month MetricType" (1-24), "N Week MetricType" (1-52), or "1 Year MetricType"
         self.metric_pattern = re.compile(
             r'(\d{1,2})\s+Month\s+(Performance|Volatility|Downside Volatility|Max Drawdown|Sharpe|Sortino|Calmar)|'
+            r'(\d{1,2})\s+Week\s+(Performance|Volatility|Downside Volatility|Max Drawdown|Sharpe|Sortino|Calmar)|'
             r'1\s+Year\s+(Performance|Volatility|Downside Volatility|Max Drawdown|Sharpe|Sortino|Calmar)',
             re.IGNORECASE
         )
@@ -66,8 +67,8 @@ class ScoreParser:
         }
     
     def extract_required_periods(self, formula):
-        """Extract all month periods required by the formula.
-        Returns a set of (months, metric_type) tuples."""
+        """Extract all period requirements.
+        Returns a set of (value, unit, metric_type) tuples."""
         required = set()
         
         # Find all matches in the formula
@@ -76,10 +77,15 @@ class ScoreParser:
                 months = int(match.group(1))
                 metric_type = match.group(2)
                 if 1 <= months <= 24:
-                    required.add((months, metric_type))
-            elif match.group(3):  # 1 Year pattern
-                metric_type = match.group(3)
-                required.add((12, metric_type))
+                    required.add((months, 'Month', metric_type))
+            elif match.group(3):  # N Week pattern
+                weeks = int(match.group(3))
+                metric_type = match.group(4)
+                if 1 <= weeks <= 52:
+                    required.add((weeks, 'Week', metric_type))
+            elif match.group(5):  # 1 Year pattern
+                metric_type = match.group(5)
+                required.add((12, 'Month', metric_type))
         
         return required
 
@@ -106,12 +112,16 @@ class ScoreParser:
         if test_clean:
             return False, f"Unknown: {test_clean[:15]}"
         
-        # Validate month ranges
+        # Validate month/week ranges
         for match in self.metric_pattern.finditer(formula):
             if match.group(1):  # N Month pattern
                 months = int(match.group(1))
                 if months < 1 or months > 24:
                     return False, f"Invalid period: {months} months (use 1-24)"
+            elif match.group(3):  # N Week pattern
+                weeks = int(match.group(3))
+                if weeks < 1 or weeks > 52:
+                    return False, f"Invalid period: {weeks} weeks (use 1-52)"
         
         # Try to evaluate with dummy values to check syntax
         try:
@@ -154,8 +164,12 @@ class ScoreParser:
                 months = int(match.group(1))
                 metric_type = match.group(2)
                 metric_name = f'{months} Month {metric_type}'
+            elif match.group(3):  # N Week pattern
+                weeks = int(match.group(3))
+                metric_type = match.group(4)
+                metric_name = f'{weeks} Week {metric_type}'
             else:  # 1 Year pattern
-                metric_type = match.group(3)
+                metric_type = match.group(5)
                 metric_name = f'1 Year {metric_type}'
             
             val = row.get(metric_name, 0)
