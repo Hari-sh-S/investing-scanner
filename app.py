@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from engine import BacktestEngine
@@ -848,36 +849,48 @@ with main_tabs[0]:
                                             
                                             if sample_curves:
                                                 fig_mc = go.Figure()
-                                                # Plot sample simulation curves (faded)
-                                                for curve in sample_curves[:100]:
+                                                
+                                                # Plot sample simulation curves (more visible)
+                                                for i, curve in enumerate(sample_curves[:50]):  # Reduced to 50 for clarity
                                                     fig_mc.add_trace(go.Scatter(
                                                         x=list(range(len(curve))), y=curve, mode='lines',
-                                                        line=dict(color='rgba(150, 150, 150, 0.15)', width=1),
+                                                        line=dict(color='rgba(100, 149, 237, 0.35)', width=1.5),  # Cornflower blue, more opaque
                                                         showlegend=False, hoverinfo='skip'
                                                     ))
-                                                # Plot historical
+                                                
+                                                # Plot historical (prominent)
                                                 if historical_curve:
                                                     fig_mc.add_trace(go.Scatter(
                                                         x=list(range(len(historical_curve))), y=historical_curve,
                                                         mode='lines', name='Historical',
-                                                        line=dict(color='#28a745', width=2)
+                                                        line=dict(color='#00ff88', width=3)  # Bright green, thicker
                                                     ))
                                                 
                                                 # Add starting capital line
                                                 fig_mc.add_hline(
                                                     y=results['initial_capital'],
-                                                    line_dash="dash", line_color="yellow"
+                                                    line_dash="dash", line_color="yellow", line_width=2
                                                 )
                                                 
                                                 # Determine X-axis label
                                                 mc_level = results.get('level', 'trade')
                                                 xaxis_label = "Months" if mc_level == 'portfolio' else "Trades"
                                                 
+                                                # Calculate y-axis range to focus on main cluster (exclude extreme outliers)
+                                                all_values = [v for curve in sample_curves[:50] for v in curve]
+                                                if all_values:
+                                                    p5, p95 = np.percentile(all_values, [2, 98])
+                                                    y_min = max(0, p5 * 0.8)
+                                                    y_max = p95 * 1.2
+                                                else:
+                                                    y_min, y_max = 0, results['initial_capital'] * 3
+                                                
                                                 fig_mc.update_layout(
                                                     title=f"{title} Equity Paths",
                                                     xaxis_title=xaxis_label, yaxis_title="Portfolio Value",
-                                                    height=350, template='plotly_dark',
+                                                    height=400, template='plotly_dark',  # Taller chart
                                                     margin=dict(l=40, r=40, t=40, b=40),
+                                                    yaxis=dict(range=[y_min, y_max]),  # Focused range
                                                     legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
                                                 )
                                                 st.plotly_chart(fig_mc, use_container_width=True)
