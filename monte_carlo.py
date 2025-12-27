@@ -519,8 +519,8 @@ class PortfolioMonteCarloSimulator:
         cagrs = np.zeros(self.n_simulations)
         ruin_count = 0
         
-        # Store sample equity curves for charting (200 paths like GPT)
-        n_sample_curves = min(200, self.n_simulations)
+        # Store sample equity curves for charting (1000 paths like GPT)
+        n_sample_curves = min(1000, self.n_simulations)
         sample_equity_curves = []
         
         # Also compute and store historical equity curve

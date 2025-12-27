@@ -850,37 +850,41 @@ with main_tabs[0]:
                                             if sample_curves:
                                                 fig_mc = go.Figure()
                                                 
-                                                # Plot sample simulation curves (200 paths like GPT)
-                                                for i, curve in enumerate(sample_curves[:200]):
+                                                # Color palette for simulation paths (like GPT's matplotlib colorful fan)
+                                                n_curves = min(1000, len(sample_curves))
+                                                
+                                                # Plot sample simulation curves with varying colors
+                                                for i, curve in enumerate(sample_curves[:n_curves]):
+                                                    # Create color gradient from light orange to light blue
+                                                    hue = (i / n_curves) * 0.6  # Range from 0 to 0.6 (orange to blue)
+                                                    color = f'hsla({int(hue * 360)}, 70%, 60%, 0.15)'
                                                     fig_mc.add_trace(go.Scatter(
                                                         x=list(range(len(curve))), y=curve, mode='lines',
-                                                        line=dict(color='rgba(100, 149, 237, 0.25)', width=1),  # Blue lines
+                                                        line=dict(color=color, width=0.8),
                                                         showlegend=False, hoverinfo='skip'
                                                     ))
                                                 
-                                                # Plot historical (thick prominent line like GPT)
+                                                # Plot historical (thick teal/cyan line like GPT)
                                                 if historical_curve:
                                                     fig_mc.add_trace(go.Scatter(
                                                         x=list(range(len(historical_curve))), y=historical_curve,
                                                         mode='lines', name='Historical',
-                                                        line=dict(color='#00ff88', width=4)  # Thick green line
+                                                        line=dict(color='#17a2b8', width=4)  # Teal like GPT
                                                     ))
-                                                
-                                                # Add starting capital line
-                                                fig_mc.add_hline(
-                                                    y=results['initial_capital'],
-                                                    line_dash="dash", line_color="yellow", line_width=2
-                                                )
                                                 
                                                 # Determine X-axis label
                                                 mc_level = results.get('level', 'trade')
                                                 xaxis_label = "Months" if mc_level == 'portfolio' else "Trades"
                                                 
+                                                # Chart title with method name
+                                                method_name = results.get('method_name', title)
+                                                chart_title = f"Monte Carlo {method_name} - Monthly Portfolio Equity Paths"
+                                                
                                                 fig_mc.update_layout(
-                                                    title=f"{title} Equity Paths",
-                                                    xaxis_title=xaxis_label, yaxis_title="Portfolio Value",
-                                                    height=450, template='plotly_dark',
-                                                    margin=dict(l=40, r=40, t=40, b=40),
+                                                    title=chart_title,
+                                                    xaxis_title=xaxis_label, yaxis_title="Equity",
+                                                    height=500, template='plotly_dark',
+                                                    margin=dict(l=50, r=40, t=60, b=50),
                                                     legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
                                                 )
                                                 st.plotly_chart(fig_mc, use_container_width=True)
