@@ -812,6 +812,17 @@ with main_tabs[0]:
                                     monthly_returns = extract_monthly_returns(engine.portfolio_df)
                                     
                                     if len(monthly_returns) >= 6:
+                                        # Data Quality Check
+                                        min_ret = min(monthly_returns)
+                                        max_ret = max(monthly_returns)
+                                        
+                                        if min_ret < -0.5 or max_ret > 1.0:
+                                            st.warning(f"⚠️ **Data Quality Warning:** Extreme monthly returns detected (Min: {min_ret*100:.1f}%, Max: {max_ret*100:.1f}%). Check your historical data for glitches.")
+                                        
+                                        with st.expander("Debug: Monthly Returns Data (Click to Inspect)"):
+                                            st.write(pd.DataFrame(monthly_returns, columns=["Monthly Return"]).describe())
+                                            st.line_chart(monthly_returns)
+                                        
                                         with st.spinner("Running Portfolio-Level Monte Carlo (Monthly Returns)..."):
                                             mc = PortfolioMonteCarloSimulator(
                                                 monthly_returns=monthly_returns,
@@ -868,9 +879,13 @@ with main_tabs[0]:
                                                     line_dash="dash", line_color="yellow"
                                                 )
                                                 
+                                                # Determine X-axis label
+                                                mc_level = results.get('level', 'trade')
+                                                xaxis_label = "Months" if mc_level == 'portfolio' else "Trades"
+                                                
                                                 fig_mc.update_layout(
                                                     title=f"{title} Equity Paths",
-                                                    xaxis_title="Trades", yaxis_title="Portfolio Value",
+                                                    xaxis_title=xaxis_label, yaxis_title="Portfolio Value",
                                                     height=350, template='plotly_dark',
                                                     margin=dict(l=40, r=40, t=40, b=40),
                                                     legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
