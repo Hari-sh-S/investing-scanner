@@ -535,12 +535,12 @@ with main_tabs[0]:
                                     # Run Portfolio MC
                                     from monte_carlo import PortfolioMonteCarloSimulator
                                     
-                                    mc_sim = PortfolioMonteCarloSimulator(initial_capital)
-                                    mc_sim.set_monthly_returns(m_returns)
+                                    # Constructor signature: (monthly_returns, initial_capital, n_simulations)
+                                    mc_sim = PortfolioMonteCarloSimulator(m_returns.tolist(), initial_capital, n_simulations=10000)
                                     
                                     # Run simulations
-                                    res_reshuffle = mc_sim.run_simulations(n_sims=10000, method='reshuffle')
-                                    res_resample = mc_sim.run_simulations(n_sims=10000, method='resample')
+                                    res_reshuffle = mc_sim.run_simulations(method='reshuffle')
+                                    res_resample = mc_sim.run_simulations(method='resample')
                                     
                                     mc_results = {
                                         'perm_dd_95': res_reshuffle.get('mc_max_dd_95', 0),
