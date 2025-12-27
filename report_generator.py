@@ -336,28 +336,28 @@ def create_pdf_report(config, metrics, engine=None):
     title_style = ParagraphStyle(
         'CustomTitle',
         parent=styles['Heading1'],
-        fontSize=24,
+        fontSize=22,
         textColor=colors.HexColor('#1F4E79'),
         alignment=TA_CENTER,
-        spaceAfter=20
+        spaceAfter=8
     )
     
     subtitle_style = ParagraphStyle(
         'CustomSubtitle',
         parent=styles['Normal'],
-        fontSize=12,
+        fontSize=10,
         textColor=colors.grey,
         alignment=TA_CENTER,
-        spaceAfter=30
+        spaceAfter=12
     )
     
     section_style = ParagraphStyle(
         'SectionHeader',
         parent=styles['Heading2'],
-        fontSize=14,
+        fontSize=12,
         textColor=colors.HexColor('#1F4E79'),
-        spaceBefore=20,
-        spaceAfter=10
+        spaceBefore=10,
+        spaceAfter=6
     )
     
     # ==================== HEADER ====================
@@ -392,7 +392,7 @@ def create_pdf_report(config, metrics, engine=None):
         ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
     ]))
     story.append(overview_table)
-    story.append(Spacer(1, 20))
+    story.append(Spacer(1, 10))
     
     # ==================== KEY PERFORMANCE INDICATORS ====================
     story.append(Paragraph("Key Performance Indicators", section_style))
@@ -432,7 +432,7 @@ def create_pdf_report(config, metrics, engine=None):
         ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
     ]))
     story.append(kpi_table)
-    story.append(Spacer(1, 20))
+    story.append(Spacer(1, 10))
     
     # ==================== ADDITIONAL METRICS ====================
     story.append(Paragraph("Trading Statistics", section_style))
