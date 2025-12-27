@@ -819,7 +819,7 @@ with main_tabs[0]:
                                             results_resample = mc.run_simulations(method='resample')
                                             interp_resample = mc.get_interpretation()
                                         
-                                        st.success(f"✅ Trade-Level MC completed using {len(trade_pnls)} trades over {years:.1f} years")
+                                        st.success(f"✅ Trade-Level MC completed: **10,000 simulations** using {len(trade_pnls)} trades over {years:.1f} years")
                                     else:
                                         st.warning(f"Need at least 10 completed trades for Monte Carlo analysis. Currently have {len(trade_pnls)} trades.")
                                         results_reshuffle = results_resample = None
@@ -871,7 +871,7 @@ with main_tabs[0]:
                                             results_resample = mc.run_simulations(method='resample')
                                             interp_resample = mc.get_interpretation()
                                         
-                                        st.success(f"✅ Portfolio-Level MC completed using {len(monthly_returns)} monthly returns over {years:.1f} years")
+                                        st.success(f"✅ Portfolio-Level MC completed: **10,000 simulations** using {len(monthly_returns)} monthly returns over {years:.1f} years")
                                     else:
                                         st.warning(f"Need at least 6 months of data for Portfolio Monte Carlo. Currently have {len(monthly_returns)} months.")
                                         results_reshuffle = results_resample = None
