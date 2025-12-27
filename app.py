@@ -638,8 +638,8 @@ with main_tabs[0]:
                                 'num_stocks': num_stocks,
                                 'exit_rank': exit_rank,
                                 'rebalance_freq': rebalance_label,
-                                'start_date': str(bt_start),
-                                'end_date': str(bt_end),
+                                'start_date': start_date.strftime('%Y-%m-%d'),
+                                'end_date': end_date.strftime('%Y-%m-%d'),
                                 'formula': formula,
                                 'regime_config': regime_config,
                                 'uncorrelated_config': uncorrelated_config
