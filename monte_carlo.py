@@ -47,13 +47,15 @@ class MonteCarloSimulator:
         for pnl in self.trade_pnls:
             equity += pnl
             
-            # Update peak
-            if equity > peak:
-                peak = equity
+            # Update peak (only if equity is positive and above 50% of initial)
+            if equity > 0 and equity >= self.initial_capital * 0.5:
+                if equity > peak:
+                    peak = equity
             
-            # Calculate drawdown
+            # Calculate drawdown (cap at 100%)
             if peak > 0:
                 dd = ((peak - equity) / peak) * 100
+                dd = min(dd, 100.0)  # Cap at 100%
                 max_dd = max(max_dd, dd)
             
             # Track losing streak
@@ -140,13 +142,15 @@ class MonteCarloSimulator:
                 if i < n_sample_curves:
                     curve.append(equity)
                 
-                # Update peak
-                if equity > peak:
-                    peak = equity
+                # Update peak (only if equity is positive and above ruin threshold)
+                if equity > 0 and equity >= self.initial_capital * 0.5:
+                    if equity > peak:
+                        peak = equity
                 
-                # Calculate drawdown
+                # Calculate drawdown (cap at 100%)
                 if peak > 0:
                     dd = ((peak - equity) / peak) * 100
+                    dd = min(dd, 100.0)  # Cap at 100%
                     max_dd = max(max_dd, dd)
                 
                 # Track losing streak
