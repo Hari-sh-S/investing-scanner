@@ -721,6 +721,55 @@ def create_pdf_report(config, metrics, engine=None, mc_results=None, regime_data
         except Exception as e:
             story.append(Paragraph(f"Could not generate MC chart: {str(e)}", styles['Normal']))
 
+    # ==================== TRADE HISTORY ====================
+    if engine and hasattr(engine, 'trades_df') and engine.trades_df is not None and not engine.trades_df.empty:
+        story.append(PageBreak())
+        story.append(Paragraph("Trade History", section_style))
+        
+        try:
+            trades_df = engine.trades_df.copy()
+            
+            # Get most recent 50 trades for PDF (avoid bloat)
+            if len(trades_df) > 50:
+                trades_df = trades_df.tail(50)
+                story.append(Paragraph("(Showing last 50 trades)", styles['Normal']))
+            
+            # Build trade table
+            trade_headers = ['Date', 'Stock', 'Action', 'Price', 'Shares', 'Value']
+            trade_data = [trade_headers]
+            
+            for _, row in trades_df.iterrows():
+                try:
+                    date_str = row['Date'].strftime('%Y-%m-%d') if hasattr(row['Date'], 'strftime') else str(row['Date'])[:10]
+                    trade_data.append([
+                        date_str,
+                        str(row.get('Stock', ''))[:10],
+                        str(row.get('Action', '')),
+                        f"₹{row.get('Price', 0):,.1f}",
+                        str(int(row.get('Shares', 0))),
+                        f"₹{row.get('Value', 0):,.0f}"
+                    ])
+                except:
+                    continue
+            
+            if len(trade_data) > 1:
+                trade_table = Table(trade_data, colWidths=[2.5*cm, 2.5*cm, 1.5*cm, 2.5*cm, 1.5*cm, 2.5*cm])
+                trade_table.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#343a40')),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                    ('FONTSIZE', (0, 0), (-1, -1), 8),
+                    ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                    ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                    ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#dee2e6')),
+                    ('TOPPADDING', (0, 0), (-1, -1), 3),
+                    ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+                    ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f8f9fa')]),
+                ]))
+                story.append(trade_table)
+        except Exception as e:
+            story.append(Paragraph(f"Could not generate trade history: {str(e)}", styles['Normal']))
+
     # ==================== MONTE CARLO RESULTS ====================
     if mc_results:
         story.append(Spacer(1, 20))

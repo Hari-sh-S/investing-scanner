@@ -524,11 +524,15 @@ with main_tabs[0]:
                             try:
                                 # Extract monthly returns from portfolio for robust MC
                                 p_values = engine.portfolio_df['Portfolio Value']
-                                m_returns = p_values.resample('ME').last().pct_change().dropna()
+                                # Use 'M' for monthly (compatible with older pandas, 'ME' is newer)
+                                try:
+                                    m_returns = p_values.resample('ME').last().pct_change().dropna()
+                                except ValueError:
+                                    # Fallback for older pandas versions
+                                    m_returns = p_values.resample('M').last().pct_change().dropna()
                                 
                                 if len(m_returns) >= 6:
                                     # Run Portfolio MC
-                                    sys.path.append(os.path.dirname(os.path.abspath(__file__)))
                                     from monte_carlo import PortfolioMonteCarloSimulator
                                     
                                     mc_sim = PortfolioMonteCarloSimulator(initial_capital)
@@ -551,8 +555,10 @@ with main_tabs[0]:
                                         'initial_capital': initial_capital,
                                         'monthly_returns': m_returns.tolist()
                                     }
+                                else:
+                                    st.warning(f"Need ≥6 months for MC. Have {len(m_returns)} months.")
                             except Exception as e:
-                                print(f"MC Auto-Run Error: {e}")
+                                st.error(f"MC Calculation Error: {e}")
                                 mc_results = None
 
                         # Calculate Equity Analysis (Regime)
