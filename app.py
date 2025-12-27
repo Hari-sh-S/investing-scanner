@@ -518,24 +518,83 @@ with main_tabs[0]:
                         st.session_state.backtest_logs.append(backtest_log)
                         save_backtest_logs(st.session_state.backtest_logs)  # Save to file
                         
+                        # Auto-calculate Monte Carlo Results (10,000 simulations)
+                        mc_results = None
+                        with st.spinner("Calculating Monte Carlo Analysis & Generating Reports..."):
+                            try:
+                                # Extract monthly returns from portfolio for robust MC
+                                p_values = engine.portfolio_df['Portfolio Value']
+                                m_returns = p_values.resample('ME').last().pct_change().dropna()
+                                
+                                if len(m_returns) >= 6:
+                                    # Run Portfolio MC
+                                    sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+                                    from monte_carlo import PortfolioMonteCarloSimulator
+                                    
+                                    mc_sim = PortfolioMonteCarloSimulator(initial_capital)
+                                    mc_sim.set_monthly_returns(m_returns)
+                                    
+                                    # Run simulations
+                                    res_reshuffle = mc_sim.run_simulations(n_sims=10000, method='reshuffle')
+                                    res_resample = mc_sim.run_simulations(n_sims=10000, method='resample')
+                                    
+                                    mc_results = {
+                                        'perm_dd_95': res_reshuffle.get('mc_max_dd_95', 0),
+                                        'perm_dd_worst': res_reshuffle.get('mc_max_dd_worst', 0),
+                                        'perm_ruin': res_reshuffle.get('ruin_probability', 0),
+                                        'perm_cagr_med': res_reshuffle.get('mc_cagr_median', 0),
+                                        'boot_dd_95': res_resample.get('mc_max_dd_95', 0),
+                                        'boot_dd_worst': res_resample.get('mc_max_dd_worst', 0),
+                                        'boot_ruin': res_resample.get('ruin_probability', 0),
+                                        'boot_cagr_med': res_resample.get('mc_cagr_median', 0),
+                                        'n_simulations': 10000,
+                                        'initial_capital': initial_capital,
+                                        'monthly_returns': m_returns.tolist()
+                                    }
+                            except Exception as e:
+                                print(f"MC Auto-Run Error: {e}")
+                                mc_results = None
+
+                        # Calculate Equity Analysis (Regime)
+                        equity_analysis = None
+                        if hasattr(engine, 'get_equity_regime_analysis'):
+                            equity_analysis = engine.get_equity_regime_analysis()
+
                         # Store current backtest data in session_state for persistence
                         st.session_state['current_backtest'] = {
                             'engine': engine,
                             'metrics': metrics,
                             'backtest_log': backtest_log,
                             'start_date': start_date,
-                            'end_date': end_date
+                            'end_date': end_date,
+                            'mc_results': mc_results,
+                            'equity_analysis': equity_analysis
                         }
+                        # Also assist the MC tab by pre-populating export data
+                        st.session_state['mc_results_for_export'] = mc_results
+                        
                         st.session_state['current_backtest_active'] = True
                         
                         st.markdown("---")
                         
+                        # Prepare Report Config
+                        report_config = backtest_log['config'].copy()
+                        # Ensure dates are strings
+                        report_config['start_date'] = start_date.strftime('%Y-%m-%d')
+                        report_config['end_date'] = end_date.strftime('%Y-%m-%d')
+                        if regime_config: report_config['regime_config'] = regime_config
+                        if uncorrelated_config: report_config['uncorrelated_config'] = uncorrelated_config
+
                         # Action buttons - Excel and PDF downloads
                         col_h, col_excel, col_pdf = st.columns([3, 1, 1])
                         with col_h:
                             st.subheader("Backtest Results")
                         with col_excel:
-                            excel_data = create_excel_with_charts(backtest_log['config'], metrics, engine)
+                            excel_data = create_excel_with_charts(
+                                report_config, metrics, engine, 
+                                mc_results=mc_results, 
+                                regime_data=equity_analysis
+                            )
                             st.download_button(
                                 label="📥 Excel",
                                 data=excel_data,
@@ -543,7 +602,11 @@ with main_tabs[0]:
                                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                             )
                         with col_pdf:
-                            pdf_data = create_pdf_report(backtest_log['config'], metrics, engine)
+                            pdf_data = create_pdf_report(
+                                report_config, metrics, engine,
+                                mc_results=mc_results,
+                                regime_data=equity_analysis
+                            )
                             st.download_button(
                                 label="📄 PDF",
                                 data=pdf_data,
@@ -552,9 +615,6 @@ with main_tabs[0]:
                             )
                         
                         # Result tabs - add regime-specific tabs based on filter type
-                        equity_analysis = None
-                        if hasattr(engine, 'get_equity_regime_analysis'):
-                            equity_analysis = engine.get_equity_regime_analysis()
                         
                         # Build tab list dynamically
                         tab_names = ["Performance Metrics", "Charts", "Monthly Breakup", "Monthly Report", "Trade History", "Monte Carlo Analysis"]
@@ -625,54 +685,7 @@ with main_tabs[0]:
                                 charges_col2.write(f"**GST (18%):** ₹{metrics.get('GST', 0):,.2f}")
                                 charges_col2.write(f"**Total Charges:** ₹{metrics.get('Total Charges', 0):,.2f}")
                             
-                            # Download Buttons for Reports
-                            st.markdown("---")
-                            st.markdown("**📥 Export Reports**")
-                            dl_col1, dl_col2, dl_col3 = st.columns([1, 1, 2])
-                            
-                            # Prepare config for reports
-                            report_config = {
-                                'name': st.session_state.get('strategy_name', 'Backtest'),
-                                'initial_capital': engine.initial_capital,
-                                'universe_name': selected_universe,
-                                'num_stocks': num_stocks,
-                                'exit_rank': exit_rank,
-                                'rebalance_freq': rebalance_label,
-                                'start_date': start_date.strftime('%Y-%m-%d'),
-                                'end_date': end_date.strftime('%Y-%m-%d'),
-                                'formula': formula,
-                                'regime_config': regime_config,
-                                'uncorrelated_config': uncorrelated_config
-                            }
-                            
-                            # Get MC results if available (store from MC tab)
-                            mc_results_for_report = st.session_state.get('mc_results_for_export', None)
-                            
-                            with dl_col1:
-                                excel_bytes = create_excel_with_charts(
-                                    report_config, metrics, engine, 
-                                    mc_results=mc_results_for_report,
-                                    regime_data=equity_analysis
-                                )
-                                st.download_button(
-                                    label="📊 Download Excel",
-                                    data=excel_bytes,
-                                    file_name=f"backtest_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
-                                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                                )
-                            
-                            with dl_col2:
-                                pdf_bytes = create_pdf_report(
-                                    report_config, metrics, engine,
-                                    mc_results=mc_results_for_report,
-                                    regime_data=equity_analysis
-                                )
-                                st.download_button(
-                                    label="📄 Download PDF",
-                                    data=pdf_bytes,
-                                    file_name=f"backtest_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
-                                    mime="application/pdf"
-                                )
+                            # Original download buttons removed (consolidated above)
                         with result_tabs[1]:
                             st.markdown("### Performance Charts")
                             

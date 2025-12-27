@@ -530,20 +530,44 @@ def create_pdf_report(config, metrics, engine=None, mc_results=None, regime_data
             import matplotlib.pyplot as plt
             import matplotlib.dates as mdates
             
-            # Equity Curve Chart
-            fig1, ax1 = plt.subplots(figsize=(12, 5))
+            # 1. Equity Curve Chart with Regime Signals
+            fig1, ax1 = plt.subplots(figsize=(10, 5))
             dates = engine.portfolio_df.index
             values = engine.portfolio_df['Portfolio Value']
             
             ax1.fill_between(dates, values, alpha=0.3, color='#28A745')
-            ax1.plot(dates, values, color='#28A745', linewidth=2)
-            ax1.set_title('Equity Curve', fontsize=14, fontweight='bold', color='#1F4E79')
+            ax1.plot(dates, values, color='#28A745', linewidth=2, label='Portfolio Value')
+            
+            # Add Regime Markers if available
+            if regime_data and regime_data.get('trigger_events'):
+                triggers = []
+                recoveries = []
+                for event in regime_data['trigger_events']:
+                    date = event.get('date')
+                    val = event.get('current')
+                    if date and val:
+                        if isinstance(date, str):
+                            date = datetime.strptime(date, '%Y-%m-%d').date()
+                        if event.get('type') == 'trigger':
+                            triggers.append((date, val))
+                        elif event.get('type') == 'recovery':
+                            recoveries.append((date, val))
+                
+                if triggers:
+                    dates_trig, vals_trig = zip(*triggers)
+                    ax1.scatter(dates_trig, vals_trig, color='red', marker='v', s=100, label='Regime Trigger', zorder=5)
+                if recoveries:
+                    dates_rec, vals_rec = zip(*recoveries)
+                    ax1.scatter(dates_rec, vals_rec, color='green', marker='^', s=100, label='Recovery', zorder=5)
+            
+            ax1.set_title('Equity Curve with Regime Signals', fontsize=14, fontweight='bold', color='#1F4E79')
             ax1.set_xlabel('Date', fontsize=10)
             ax1.set_ylabel('Portfolio Value', fontsize=10)
             ax1.grid(True, alpha=0.3)
             ax1.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m'))
             ax1.xaxis.set_major_locator(mdates.MonthLocator(interval=3))
-            plt.xticks(rotation=45)
+            ax1.legend()
+            plt.setp(ax1.get_xticklabels(), rotation=45)
             plt.tight_layout()
             
             # Save to bytes
@@ -553,24 +577,24 @@ def create_pdf_report(config, metrics, engine=None, mc_results=None, regime_data
             equity_bytes.seek(0)
             plt.close(fig1)
             
-            equity_img = Image(equity_bytes, width=22*cm, height=9*cm)
+            equity_img = Image(equity_bytes, width=20*cm, height=9*cm)
             story.append(equity_img)
             story.append(Spacer(1, 20))
-            
-            # Drawdown Chart
+
+            # 2. Drawdown Chart
             running_max = values.cummax()
             dd = (values - running_max) / running_max * 100
             
-            fig2, ax2 = plt.subplots(figsize=(12, 4))
+            fig2, ax2 = plt.subplots(figsize=(10, 4))
             ax2.fill_between(dates, dd, alpha=0.3, color='#DC3545')
-            ax2.plot(dates, dd, color='#DC3545', linewidth=1.5)
+            ax2.plot(dates, dd, color='#DC3545', linewidth=1.5, label='Drawdown')
             ax2.set_title('Drawdown Analysis', fontsize=14, fontweight='bold', color='#1F4E79')
             ax2.set_xlabel('Date', fontsize=10)
             ax2.set_ylabel('Drawdown %', fontsize=10)
             ax2.grid(True, alpha=0.3)
             ax2.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m'))
             ax2.xaxis.set_major_locator(mdates.MonthLocator(interval=3))
-            plt.xticks(rotation=45)
+            plt.setp(ax2.get_xticklabels(), rotation=45)
             plt.tight_layout()
             
             dd_bytes = io.BytesIO()
@@ -579,11 +603,10 @@ def create_pdf_report(config, metrics, engine=None, mc_results=None, regime_data
             dd_bytes.seek(0)
             plt.close(fig2)
             
-            dd_img = Image(dd_bytes, width=22*cm, height=7*cm)
+            dd_img = Image(dd_bytes, width=20*cm, height=7*cm)
             story.append(dd_img)
             
-        except Exception:
-            # If matplotlib fails for any reason, just skip charts silently
+        except Exception as e:
             pass
     
     # ==================== MONTHLY RETURNS ====================
@@ -652,6 +675,52 @@ def create_pdf_report(config, metrics, engine=None, mc_results=None, regime_data
     )
     story.append(Paragraph(config['formula'], formula_style))
     
+    
+    # ==================== MONTE CARLO CHART ====================
+    if mc_results and 'monthly_returns' in mc_results:
+        story.append(Spacer(1, 20))
+        story.append(Paragraph("Monte Carlo Simulation Paths (1,000 Paths)", section_style))
+        
+        try:
+            # Generate MC Chart locally
+            returns = mc_results['monthly_returns']
+            n_sims = 1000  # Limit for visualization
+            n_months = len(returns)
+            initial_cap = mc_results.get('initial_capital', 100000)
+            
+            if n_months > 0:
+                # Simple Bootstrap for visualization
+                import numpy as np
+                import matplotlib.pyplot as plt
+                
+                sim_returns = np.random.choice(returns, size=(n_months, n_sims))
+                cumulative_returns = np.cumprod(1 + sim_returns, axis=0)
+                # Add initial capital row
+                paths_data = np.vstack([np.ones((1, n_sims)), cumulative_returns])
+                paths = initial_cap * paths_data
+                
+                plt.figure(figsize=(10, 5))
+                # Plot random paths
+                plt.plot(paths, color='gray', alpha=0.05, linewidth=0.5)
+                # Plot mean path
+                plt.plot(paths.mean(axis=1), color='blue', linewidth=2, label='Mean Path', alpha=0.8)
+                plt.title(f'Monte Carlo Simulation: {n_sims} Possible Futures', fontsize=14, color='#1F4E79')
+                plt.xlabel('Months Passed', fontsize=10)
+                plt.ylabel('Portfolio Value (₹)', fontsize=10)
+                plt.grid(True, alpha=0.3)
+                plt.legend()
+                plt.tight_layout()
+                
+                mc_bytes = io.BytesIO()
+                plt.savefig(mc_bytes, format='png', dpi=100, bbox_inches='tight',
+                            facecolor='white', edgecolor='none')
+                mc_bytes.seek(0)
+                plt.close()
+                
+                story.append(Image(mc_bytes, width=20*cm, height=9*cm))
+        except Exception as e:
+            story.append(Paragraph(f"Could not generate MC chart: {str(e)}", styles['Normal']))
+
     # ==================== MONTE CARLO RESULTS ====================
     if mc_results:
         story.append(Spacer(1, 20))
