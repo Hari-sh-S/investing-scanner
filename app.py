@@ -141,8 +141,23 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Header - compact
-st.markdown("### 📊 Investing Scanner <span style='font-size: 14px; color: #888;'>v1.2 (MC Fix Applied)</span>", unsafe_allow_html=True)
+# Header - compact with last git commit timestamp
+def get_last_update_time():
+    """Get last git commit timestamp in IST format"""
+    try:
+        import subprocess
+        result = subprocess.run(
+            ['git', 'log', '-1', '--format=%cd', '--date=format:%d %b %H:%M'],
+            capture_output=True, text=True, cwd='.'
+        )
+        if result.returncode == 0:
+            return result.stdout.strip() + " IST"
+    except:
+        pass
+    return "Unknown"
+
+last_update = get_last_update_time()
+st.markdown(f"### 📊 Investing Scanner <span style='font-size: 14px; color: #888;'>Updated: {last_update}</span>", unsafe_allow_html=True)
 
 # Main Tabs
 main_tabs = st.tabs(["Backtest", "Backtest Logs", "Data Download"])
