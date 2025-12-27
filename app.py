@@ -141,7 +141,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Header - compact
-st.markdown("### 📊 Investing Scanner")
+st.markdown("### 📊 Investing Scanner <span style='font-size: 14px; color: #888;'>v1.2 (MC Fix Applied)</span>", unsafe_allow_html=True)
 
 # Main Tabs
 main_tabs = st.tabs(["Backtest", "Backtest Logs", "Data Download"])

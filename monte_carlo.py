@@ -417,6 +417,11 @@ def extract_monthly_returns(portfolio_df) -> List[float]:
     # Calculate monthly returns
     returns = monthly.pct_change().dropna()
     
+    # Outlier protection: Filter out insane returns that are likely data glitches
+    # e.g., > 1000% gain or near 100% loss in a single month
+    # We cap them to keep the simulation realistic if the underlying data has gaps
+    returns = returns.clip(lower=-0.99, upper=10.0)
+    
     return returns.tolist()
 
 
@@ -574,9 +579,10 @@ class PortfolioMonteCarloSimulator:
                     current_losing_streak = 0
                 
                 # Check ruin conditions
-                # Ruin = equity < 50% of peak OR equity < starting capital
+                # Ruin = equity < 50% of peak OR equity < 50% of initial capital
+                # Previous condition (equity < starting capital) was too aggressive
                 if not ruin_hit:
-                    if equity < 0.5 * peak or equity < self.initial_capital:
+                    if equity < 0.5 * peak or equity < 0.5 * self.initial_capital:
                         ruin_hit = True
             
             # Store sample equity curve
