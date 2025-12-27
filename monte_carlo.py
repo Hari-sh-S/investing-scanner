@@ -389,38 +389,55 @@ def extract_trade_pnls(trades_df, buy_trades_df=None) -> List[float]:
     return pnls
 
 
-def extract_monthly_returns(portfolio_df) -> List[float]:
+def extract_monthly_returns(trades_df, initial_capital: float = 100000) -> List[float]:
     """
-    Extract monthly portfolio returns from daily equity curve.
+    Extract monthly portfolio returns from trades (GPT's exact logic).
+    
+    This calculates returns based on trade PnLs grouped by exit month,
+    which is the correct approach for rebalancing strategies.
     
     Args:
-        portfolio_df: DataFrame with 'Total' column (daily equity values)
+        trades_df: DataFrame with trade data (must have 'Exit Date', 
+                   'Exit Price', 'Buy Price', 'Shares' columns)
+        initial_capital: Starting capital
     
     Returns:
         List of monthly returns (e.g., [0.023, -0.041, 0.068])
     """
     import pandas as pd
     
-    if portfolio_df is None or portfolio_df.empty:
+    if trades_df is None or trades_df.empty:
         return []
     
-    # Get the 'Total' column (portfolio value)
-    if 'Total' in portfolio_df.columns:
-        equity = portfolio_df['Total']
+    # Make a copy to avoid modifying original
+    df = trades_df.copy()
+    
+    # Ensure date columns are datetime
+    if 'Exit Date' in df.columns:
+        df['Exit Date'] = pd.to_datetime(df['Exit Date'])
     else:
-        # Fallback to first column
-        equity = portfolio_df.iloc[:, 0]
+        return []
     
-    # Resample to monthly (end of month values) with forward-fill for gaps
-    monthly = equity.resample('ME').last().ffill()
+    # Calculate trade PnL (GPT's exact formula)
+    if 'Exit Price' in df.columns and 'Buy Price' in df.columns and 'Shares' in df.columns:
+        df['pnl'] = (df['Exit Price'] - df['Buy Price']) * df['Shares']
+    else:
+        return []
     
-    # Calculate monthly returns (no artificial clipping - match GPT approach)
-    returns = monthly.pct_change().dropna()
+    # Group by exit month
+    df['month'] = df['Exit Date'].dt.to_period('M').dt.to_timestamp()
+    monthly_pnl = df.groupby('month')['pnl'].sum().sort_index()
     
-    # Only filter out truly impossible values (NaN, inf)
-    returns = returns.replace([np.inf, -np.inf], np.nan).dropna()
+    # Calculate monthly returns (GPT's exact logic)
+    equity = initial_capital
+    monthly_returns = []
     
-    return returns.tolist()
+    for pnl in monthly_pnl:
+        ret = pnl / equity
+        monthly_returns.append(ret)
+        equity *= (1 + ret)
+    
+    return monthly_returns
 
 
 class PortfolioMonteCarloSimulator:

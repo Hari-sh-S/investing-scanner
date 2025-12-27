@@ -810,7 +810,37 @@ with main_tabs[0]:
                                         results_reshuffle = results_resample = None
                                 else:
                                     # Portfolio-Level MC (for Inverse Vol, Risk Parity, Score-Weighted)
-                                    monthly_returns = extract_monthly_returns(engine.portfolio_df)
+                                    # Use GPT's exact logic: calculate monthly returns from trade PnLs
+                                    
+                                    # Build trades DataFrame (same structure as CSV export)
+                                    trades_for_mc = []
+                                    buy_trades = engine.trades_df[engine.trades_df['Action'] == 'BUY']
+                                    sell_trades = engine.trades_df[engine.trades_df['Action'] == 'SELL']
+                                    
+                                    for ticker in sell_trades['Ticker'].unique():
+                                        ticker_sells = sell_trades[sell_trades['Ticker'] == ticker]
+                                        for _, sell in ticker_sells.iterrows():
+                                            sell_date = sell['Date']
+                                            prev_buys = buy_trades[
+                                                (buy_trades['Ticker'] == ticker) & 
+                                                (buy_trades['Date'] < sell_date)
+                                            ]
+                                            if not prev_buys.empty:
+                                                buy = prev_buys.iloc[-1]
+                                                trades_for_mc.append({
+                                                    'Stock': ticker.replace('.NS', ''),
+                                                    'Buy Date': pd.to_datetime(buy['Date']),
+                                                    'Buy Price': float(buy['Price']),
+                                                    'Exit Date': pd.to_datetime(sell_date),
+                                                    'Exit Price': float(sell['Price']),
+                                                    'Shares': int(buy['Shares'])
+                                                })
+                                    
+                                    if trades_for_mc:
+                                        trades_df_for_mc = pd.DataFrame(trades_for_mc)
+                                        monthly_returns = extract_monthly_returns(trades_df_for_mc, engine.initial_capital)
+                                    else:
+                                        monthly_returns = []
                                     
                                     if len(monthly_returns) >= 6:
                                         
