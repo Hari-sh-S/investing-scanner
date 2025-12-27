@@ -624,6 +624,55 @@ with main_tabs[0]:
                                 charges_col2.write(f"**Stamp Charges (0.015%):** ₹{metrics.get('Stamp Charges', 0):,.2f}")
                                 charges_col2.write(f"**GST (18%):** ₹{metrics.get('GST', 0):,.2f}")
                                 charges_col2.write(f"**Total Charges:** ₹{metrics.get('Total Charges', 0):,.2f}")
+                            
+                            # Download Buttons for Reports
+                            st.markdown("---")
+                            st.markdown("**📥 Export Reports**")
+                            dl_col1, dl_col2, dl_col3 = st.columns([1, 1, 2])
+                            
+                            # Prepare config for reports
+                            report_config = {
+                                'name': st.session_state.get('strategy_name', 'Backtest'),
+                                'initial_capital': engine.initial_capital,
+                                'universe_name': st.session_state.get('universe_name', 'Unknown'),
+                                'num_stocks': backtest_config.get('num_stocks', 5),
+                                'exit_rank': backtest_config.get('exit_rank', 5),
+                                'rebalance_freq': backtest_config.get('rebalance_freq', 'Monthly'),
+                                'start_date': str(bt_start),
+                                'end_date': str(bt_end),
+                                'formula': formula,
+                                'regime_config': regime_config,
+                                'uncorrelated_config': uncorrelated_config
+                            }
+                            
+                            # Get MC results if available (store from MC tab)
+                            mc_results_for_report = st.session_state.get('mc_results_for_export', None)
+                            
+                            with dl_col1:
+                                excel_bytes = create_excel_with_charts(
+                                    report_config, metrics, engine, 
+                                    mc_results=mc_results_for_report,
+                                    regime_data=equity_analysis
+                                )
+                                st.download_button(
+                                    label="📊 Download Excel",
+                                    data=excel_bytes,
+                                    file_name=f"backtest_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+                                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                                )
+                            
+                            with dl_col2:
+                                pdf_bytes = create_pdf_report(
+                                    report_config, metrics, engine,
+                                    mc_results=mc_results_for_report,
+                                    regime_data=equity_analysis
+                                )
+                                st.download_button(
+                                    label="📄 Download PDF",
+                                    data=pdf_bytes,
+                                    file_name=f"backtest_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
+                                    mime="application/pdf"
+                                )
                         with result_tabs[1]:
                             st.markdown("### Performance Charts")
                             
@@ -875,6 +924,21 @@ with main_tabs[0]:
                                     else:
                                         st.warning(f"Need at least 6 months of data for Portfolio Monte Carlo. Currently have {len(monthly_returns)} months.")
                                         results_reshuffle = results_resample = None
+                                
+                                # Store MC results in session for export
+                                if results_reshuffle is not None and results_resample is not None:
+                                    st.session_state['mc_results_for_export'] = {
+                                        'perm_dd_95': results_reshuffle.get('mc_max_dd_95', 0),
+                                        'perm_dd_worst': results_reshuffle.get('mc_max_dd_worst', 0),
+                                        'perm_ruin': results_reshuffle.get('ruin_probability', 0),
+                                        'perm_cagr_med': results_reshuffle.get('mc_cagr_median', 0),
+                                        'boot_dd_95': results_resample.get('mc_max_dd_95', 0),
+                                        'boot_dd_worst': results_resample.get('mc_max_dd_worst', 0),
+                                        'boot_ruin': results_resample.get('ruin_probability', 0),
+                                        'boot_cagr_med': results_resample.get('mc_cagr_median', 0),
+                                        'n_simulations': 10000,
+                                        'initial_capital': engine.initial_capital
+                                    }
                                 
                                 # Display results if available
                                 if results_reshuffle is not None and results_resample is not None:

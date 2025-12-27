@@ -10,7 +10,7 @@ import numpy as np
 from datetime import datetime
 
 
-def create_excel_with_charts(config, metrics, engine=None):
+def create_excel_with_charts(config, metrics, engine=None, mc_results=None, regime_data=None):
     """
     Create an Excel file with all backtest data and embedded charts.
     
@@ -18,6 +18,8 @@ def create_excel_with_charts(config, metrics, engine=None):
         config: Backtest configuration dictionary
         metrics: Performance metrics dictionary
         engine: PortfolioEngine instance (optional, for detailed data)
+        mc_results: Monte Carlo simulation results (optional)
+        regime_data: Regime filter analysis data (optional)
     
     Returns:
         BytesIO object containing the Excel file
@@ -300,12 +302,64 @@ def create_excel_with_charts(config, metrics, engine=None):
             ws_trades.column_dimensions['F'].width = 10  # Shares
             ws_trades.column_dimensions['G'].width = 10  # ROI %
     
+    # ==================== SHEET 6: MONTE CARLO RESULTS ====================
+    if mc_results:
+        ws_mc = wb.create_sheet("Monte Carlo Analysis")
+        
+        mc_data = [["Monte Carlo Simulation Results", ""]]
+        mc_data.append(["", ""])
+        mc_data.append(["Initial Capital", f"₹{mc_results.get('initial_capital', 100000):,}"])
+        mc_data.append(["Simulations", f"{mc_results.get('n_simulations', 10000):,}"])
+        mc_data.append(["", ""])
+        mc_data.append(["Metric", "Value"])
+        mc_data.append(["Max Drawdown (95th %ile)", f"{mc_results.get('mc_max_dd_95', 0):.1f}%"])
+        mc_data.append(["Worst-Case Drawdown", f"{mc_results.get('mc_max_dd_worst', 0):.1f}%"])
+        mc_data.append(["Ruin Probability (DD ≥ 50%)", f"{mc_results.get('ruin_probability', 0):.1f}%"])
+        mc_data.append(["CAGR (Median)", f"{mc_results.get('mc_cagr_median', 0):.1f}%"])
+        mc_data.append(["CAGR (5th %ile)", f"{mc_results.get('mc_cagr_5th', 0):.1f}%"])
+        mc_data.append(["CAGR (95th %ile)", f"{mc_results.get('mc_cagr_95th', 0):.1f}%"])
+        
+        for row_idx, row in enumerate(mc_data, 1):
+            for col_idx, value in enumerate(row, 1):
+                cell = ws_mc.cell(row=row_idx, column=col_idx, value=value)
+                cell.border = thin_border
+                if row_idx == 1:
+                    cell.fill = header_fill
+                    cell.font = header_font
+                elif row_idx == 6:  # Second header row
+                    cell.fill = PatternFill(start_color="28A745", end_color="28A745", fill_type="solid")
+                    cell.font = header_font
+        
+        ws_mc.column_dimensions['A'].width = 30
+        ws_mc.column_dimensions['B'].width = 20
+    
+    # ==================== SHEET 7: REGIME FILTER ANALYSIS ====================
+    if regime_data and regime_data.get('trigger_events'):
+        ws_regime = wb.create_sheet("Regime Filter Analysis")
+        
+        regime_headers = ["Date", "Event Type", "Equity Value", "Peak Value", "Drawdown %"]
+        for col_idx, header in enumerate(regime_headers, 1):
+            cell = ws_regime.cell(row=1, column=col_idx, value=header)
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.border = thin_border
+        
+        for row_idx, event in enumerate(regime_data['trigger_events'], 2):
+            ws_regime.cell(row=row_idx, column=1, value=event.get('date', '').strftime('%Y-%m-%d') if hasattr(event.get('date', ''), 'strftime') else str(event.get('date', ''))).border = thin_border
+            ws_regime.cell(row=row_idx, column=2, value=event.get('type', '')).border = thin_border
+            ws_regime.cell(row=row_idx, column=3, value=round(event.get('current', 0), 2)).border = thin_border
+            ws_regime.cell(row=row_idx, column=4, value=round(event.get('peak', 0), 2)).border = thin_border
+            ws_regime.cell(row=row_idx, column=5, value=round(event.get('drawdown', 0), 2)).border = thin_border
+        
+        for col in ['A', 'B', 'C', 'D', 'E']:
+            ws_regime.column_dimensions[col].width = 15
+    
     wb.save(output)
     output.seek(0)
     return output
 
 
-def create_pdf_report(config, metrics, engine=None):
+def create_pdf_report(config, metrics, engine=None, mc_results=None, regime_data=None):
     """
     Create a professional PDF report of backtest results.
     
@@ -313,6 +367,8 @@ def create_pdf_report(config, metrics, engine=None):
         config: Backtest configuration dictionary
         metrics: Performance metrics dictionary
         engine: PortfolioEngine instance (optional, for charts)
+        mc_results: Monte Carlo simulation results (optional)
+        regime_data: Regime filter analysis data (optional)
     
     Returns:
         BytesIO object containing the PDF file
@@ -595,6 +651,40 @@ def create_pdf_report(config, metrics, engine=None):
         rightIndent=20
     )
     story.append(Paragraph(config['formula'], formula_style))
+    
+    # ==================== MONTE CARLO RESULTS ====================
+    if mc_results:
+        story.append(Spacer(1, 20))
+        story.append(Paragraph("Monte Carlo Analysis (10,000 Simulations)", section_style))
+        
+        mc_table_data = [
+            ["Metric", "Permutation MC", "Bootstrap MC"],
+            ["Max Drawdown (95%)", 
+             f"{mc_results.get('perm_dd_95', mc_results.get('mc_max_dd_95', 0)):.1f}%",
+             f"{mc_results.get('boot_dd_95', mc_results.get('mc_max_dd_95', 0)):.1f}%"],
+            ["Worst-Case Drawdown", 
+             f"{mc_results.get('perm_dd_worst', mc_results.get('mc_max_dd_worst', 0)):.1f}%",
+             f"{mc_results.get('boot_dd_worst', mc_results.get('mc_max_dd_worst', 0)):.1f}%"],
+            ["Ruin Probability", 
+             f"{mc_results.get('perm_ruin', mc_results.get('ruin_probability', 0)):.1f}%",
+             f"{mc_results.get('boot_ruin', mc_results.get('ruin_probability', 0)):.1f}%"],
+            ["CAGR (Median)", 
+             f"{mc_results.get('perm_cagr_med', mc_results.get('mc_cagr_median', 0)):.1f}%",
+             f"{mc_results.get('boot_cagr_med', mc_results.get('mc_cagr_median', 0)):.1f}%"],
+        ]
+        
+        mc_table = Table(mc_table_data, colWidths=[5*cm, 4*cm, 4*cm])
+        mc_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#17a2b8')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CCCCCC')),
+            ('TOPPADDING', (0, 0), (-1, -1), 6),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ]))
+        story.append(mc_table)
     
     # ==================== FOOTER ====================
     story.append(Spacer(1, 40))
