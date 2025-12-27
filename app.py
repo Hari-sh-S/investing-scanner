@@ -9,7 +9,7 @@ from nifty_universe import (get_all_universe_names, get_universe,
                             get_broad_market_universes, get_sectoral_universes,
                             get_cap_based_universes, get_thematic_universes)
 from report_generator import create_excel_with_charts, create_pdf_report, prepare_complete_log_data
-from monte_carlo import MonteCarloSimulator, extract_trade_pnls
+from monte_carlo import MonteCarloSimulator, extract_trade_pnls, PortfolioMonteCarloSimulator, extract_monthly_returns
 import datetime
 import io
 import time
@@ -771,35 +771,66 @@ with main_tabs[0]:
                         # Monte Carlo Analysis Tab (index 5 - always present)
                         with result_tabs[5]:
                             st.markdown("### 🎲 Monte Carlo Analysis")
-                            st.caption("Trade reshuffling simulation to quantify real portfolio risk beyond historical performance")
+                            
+                            # Determine MC type based on position sizing method
+                            use_trade_level = position_sizing_method == "Equal Weight"
+                            
+                            if use_trade_level:
+                                st.caption("**Trade-Level MC** — Valid for equal-weight portfolios where each trade is independent")
+                            else:
+                                st.caption("**Portfolio-Level MC** — Monthly returns shuffling for vol-weighted portfolios")
                             
                             if not engine.trades_df.empty:
-                                # Extract trade PnLs
-                                trade_pnls = extract_trade_pnls(engine.trades_df)
+                                # Calculate test duration
+                                days = (engine.portfolio_df.index[-1] - engine.portfolio_df.index[0]).days
+                                years = days / 365.25
                                 
-                                if len(trade_pnls) >= 10:
-                                    # Calculate test duration
-                                    days = (engine.portfolio_df.index[-1] - engine.portfolio_df.index[0]).days
-                                    years = days / 365.25
+                                if use_trade_level:
+                                    # Trade-Level MC (for Equal Weight)
+                                    trade_pnls = extract_trade_pnls(engine.trades_df)
                                     
-                                    # Run Monte Carlo simulations
-                                    with st.spinner("Running Monte Carlo simulations (Reshuffle & Resample)..."):
-                                        mc = MonteCarloSimulator(
-                                            trade_pnls=trade_pnls,
-                                            initial_capital=engine.initial_capital,
-                                            test_duration_years=years,
-                                            n_simulations=10000
-                                        )
-                                        # Method 1: Reshuffle
-                                        results_reshuffle = mc.run_simulations(method='reshuffle')
-                                        interp_reshuffle = mc.get_interpretation()
+                                    if len(trade_pnls) >= 10:
+                                        with st.spinner("Running Trade-Level Monte Carlo (Reshuffle & Resample)..."):
+                                            mc = MonteCarloSimulator(
+                                                trade_pnls=trade_pnls,
+                                                initial_capital=engine.initial_capital,
+                                                test_duration_years=years,
+                                                n_simulations=10000
+                                            )
+                                            results_reshuffle = mc.run_simulations(method='reshuffle')
+                                            interp_reshuffle = mc.get_interpretation()
+                                            
+                                            results_resample = mc.run_simulations(method='resample')
+                                            interp_resample = mc.get_interpretation()
                                         
-                                        # Method 2: Resample
-                                        results_resample = mc.run_simulations(method='resample')
-                                        interp_resample = mc.get_interpretation()
+                                        st.success(f"✅ Trade-Level MC completed using {len(trade_pnls)} trades over {years:.1f} years")
+                                    else:
+                                        st.warning(f"Need at least 10 completed trades for Monte Carlo analysis. Currently have {len(trade_pnls)} trades.")
+                                        results_reshuffle = results_resample = None
+                                else:
+                                    # Portfolio-Level MC (for Inverse Vol, Risk Parity, Score-Weighted)
+                                    monthly_returns = extract_monthly_returns(engine.portfolio_df)
                                     
-                                    st.success(f"✅ Completed simulations using {len(trade_pnls)} trades over {years:.1f} years")
-                                    
+                                    if len(monthly_returns) >= 6:
+                                        with st.spinner("Running Portfolio-Level Monte Carlo (Monthly Returns)..."):
+                                            mc = PortfolioMonteCarloSimulator(
+                                                monthly_returns=monthly_returns,
+                                                initial_capital=engine.initial_capital,
+                                                n_simulations=10000
+                                            )
+                                            results_reshuffle = mc.run_simulations(method='reshuffle')
+                                            interp_reshuffle = mc.get_interpretation()
+                                            
+                                            results_resample = mc.run_simulations(method='resample')
+                                            interp_resample = mc.get_interpretation()
+                                        
+                                        st.success(f"✅ Portfolio-Level MC completed using {len(monthly_returns)} monthly returns over {years:.1f} years")
+                                    else:
+                                        st.warning(f"Need at least 6 months of data for Portfolio Monte Carlo. Currently have {len(monthly_returns)} months.")
+                                        results_reshuffle = results_resample = None
+                                
+                                # Display results if available
+                                if results_reshuffle is not None and results_resample is not None:
                                     # Create two columns for side-by-side comparison
                                     mc_col1, mc_col2 = st.columns(2)
                                     
