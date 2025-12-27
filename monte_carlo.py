@@ -412,15 +412,13 @@ def extract_monthly_returns(portfolio_df) -> List[float]:
         equity = portfolio_df.iloc[:, 0]
     
     # Resample to monthly (end of month values) with forward-fill for gaps
-    monthly = equity.resample('M').last().ffill()
+    monthly = equity.resample('ME').last().ffill()
     
-    # Calculate monthly returns
+    # Calculate monthly returns (no artificial clipping - match GPT approach)
     returns = monthly.pct_change().dropna()
     
-    # Outlier protection: Cap extreme returns to realistic bounds
-    # ±50% per month is already extreme for a diversified portfolio
-    # This prevents data glitches from breaking the simulation
-    returns = returns.clip(lower=-0.50, upper=0.50)
+    # Only filter out truly impossible values (NaN, inf)
+    returns = returns.replace([np.inf, -np.inf], np.nan).dropna()
     
     return returns.tolist()
 
@@ -521,8 +519,8 @@ class PortfolioMonteCarloSimulator:
         cagrs = np.zeros(self.n_simulations)
         ruin_count = 0
         
-        # Store sample equity curves for charting (store first 100)
-        n_sample_curves = min(100, self.n_simulations)
+        # Store sample equity curves for charting (200 paths like GPT)
+        n_sample_curves = min(200, self.n_simulations)
         sample_equity_curves = []
         
         # Also compute and store historical equity curve
@@ -550,7 +548,7 @@ class PortfolioMonteCarloSimulator:
             max_losing_streak = 0
             ruin_hit = False
             
-            # Track equity curve for sample simulations
+            # Track equity curve for sample simulations (200 paths like GPT)
             if i < n_sample_curves:
                 curve = [self.initial_capital]
             
@@ -561,15 +559,12 @@ class PortfolioMonteCarloSimulator:
                 if i < n_sample_curves:
                     curve.append(equity)
                 
-                # Update peak
-                if equity > peak:
-                    peak = equity
+                # Update peak (GPT's simple approach)
+                peak = max(peak, equity)
                 
-                # Calculate drawdown (cap at 100%)
-                if peak > 0:
-                    dd = ((peak - equity) / peak) * 100
-                    dd = min(dd, 100.0)
-                    max_dd = max(max_dd, dd)
+                # Calculate drawdown (GPT's simple approach - no artificial cap)
+                dd = (peak - equity) / peak if peak > 0 else 0
+                max_dd = max(max_dd, dd)
                 
                 # Track losing streak
                 if ret < 0:
@@ -578,19 +573,16 @@ class PortfolioMonteCarloSimulator:
                 else:
                     current_losing_streak = 0
                 
-                # Check ruin conditions
-                # Ruin = equity < 50% of peak OR equity < 50% of initial capital
-                # Previous condition (equity < starting capital) was too aggressive
-                if not ruin_hit:
-                    if equity < 0.5 * peak or equity < 0.5 * self.initial_capital:
-                        ruin_hit = True
+                # Ruin check (50% drawdown from peak)
+                if not ruin_hit and dd >= 0.5:
+                    ruin_hit = True
             
             # Store sample equity curve
             if i < n_sample_curves:
                 sample_equity_curves.append(curve)
             
-            # Store results
-            max_drawdowns[i] = max_dd
+            # Store results (DD as percentage)
+            max_drawdowns[i] = max_dd * 100  # Convert to percentage
             max_losing_streaks[i] = max_losing_streak
             final_equities[i] = equity
             
