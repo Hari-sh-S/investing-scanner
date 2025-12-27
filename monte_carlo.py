@@ -411,16 +411,16 @@ def extract_monthly_returns(portfolio_df) -> List[float]:
         # Fallback to first column
         equity = portfolio_df.iloc[:, 0]
     
-    # Resample to monthly (end of month values)
-    monthly = equity.resample('M').last()
+    # Resample to monthly (end of month values) with forward-fill for gaps
+    monthly = equity.resample('M').last().ffill()
     
     # Calculate monthly returns
     returns = monthly.pct_change().dropna()
     
-    # Outlier protection: Filter out insane returns that are likely data glitches
-    # e.g., > 1000% gain or near 100% loss in a single month
-    # We cap them to keep the simulation realistic if the underlying data has gaps
-    returns = returns.clip(lower=-0.99, upper=10.0)
+    # Outlier protection: Cap extreme returns to realistic bounds
+    # ±50% per month is already extreme for a diversified portfolio
+    # This prevents data glitches from breaking the simulation
+    returns = returns.clip(lower=-0.50, upper=0.50)
     
     return returns.tolist()
 
