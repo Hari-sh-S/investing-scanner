@@ -27,12 +27,29 @@ SECURITY_ID_CACHE: dict[str, int] = {}
 INSTRUMENTS_CACHE_PATH = Path("dhan_instruments_cache.csv")
 
 
-def _convert_dhan_timestamp(dhan_ts: int) -> datetime:
-    """Convert Dhan's custom epoch timestamp to datetime.
+def _convert_dhan_timestamp(dhan_ts) -> datetime:
+    """Convert Dhan's timestamp to datetime.
     
-    Dhan uses seconds since 1980-01-01 00:00:00 IST.
+    Dhan may return timestamps in different formats:
+    - Integer/float: seconds since 1980-01-01 00:00:00 IST
+    - String: date string like '2024-01-15'
     """
-    return DHAN_EPOCH + timedelta(seconds=dhan_ts)
+    # Handle string input
+    if isinstance(dhan_ts, str):
+        # Try parsing as date string first
+        try:
+            return datetime.strptime(dhan_ts, '%Y-%m-%d')
+        except ValueError:
+            pass
+        # Try as numeric string
+        try:
+            dhan_ts = int(float(dhan_ts))
+        except ValueError:
+            # Return current date as fallback
+            return datetime.now()
+    
+    # Handle numeric timestamp (Dhan's custom epoch from 1980)
+    return DHAN_EPOCH + timedelta(seconds=int(dhan_ts))
 
 
 def _download_instruments_list() -> pd.DataFrame:
