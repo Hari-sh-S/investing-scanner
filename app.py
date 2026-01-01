@@ -245,9 +245,9 @@ with main_tabs[0]:
         with st.expander("📊 Position Sizing", expanded=False):
             position_sizing_method = st.selectbox(
                 "Sizing Method",
-                ["Equal Weight", "Inverse Volatility", "Score-Weighted", "Risk Parity"],
+                ["Equal Weight", "Inverse Volatility", "Inverse Downside Vol", "Inverse Max Drawdown", "Score-Weighted", "Risk Parity"],
                 index=0,
-                help="Equal Weight: Divide equally | Inverse Volatility: More to lower vol | Score-Weighted: More to higher scores | Risk Parity: Equal risk contribution"
+                help="Equal Weight: Divide equally | Inverse Volatility: Lower vol = higher weight | Inverse Downside Vol: Lower downside risk = higher weight | Inverse Max Drawdown: Lower drawdown = higher weight"
             )
             
             use_max_position_cap = st.checkbox(

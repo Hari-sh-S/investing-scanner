@@ -1137,6 +1137,51 @@ class PortfolioEngine:
                             for ticker, score in top_stocks:
                                 weights[ticker] = 1.0 / len(top_stocks)
                     
+                    elif sizing_method == 'inverse_downside_vol':
+                        # Allocate more to stocks with lower downside volatility (semi-deviation)
+                        # Only considers negative returns
+                        downside_vols = {}
+                        for ticker, score in top_stocks:
+                            if ticker in self.data and len(self.data[ticker]) >= 20:
+                                returns = self.data[ticker]['Close'].pct_change().dropna()
+                                recent_returns = returns.iloc[-60:] if len(returns) > 60 else returns
+                                # Only negative returns
+                                negative_returns = recent_returns[recent_returns < 0]
+                                if len(negative_returns) > 5:
+                                    downside_vol = negative_returns.std() * (252 ** 0.5)
+                                    downside_vols[ticker] = downside_vol if downside_vol > 0 else 0.01
+                                else:
+                                    downside_vols[ticker] = 0.2  # Default 20%
+                            else:
+                                downside_vols[ticker] = 0.2
+                        
+                        # Inverse downside volatility weights
+                        inv_dvols = {t: 1/v for t, v in downside_vols.items()}
+                        total_inv_dvol = sum(inv_dvols.values())
+                        for ticker, score in top_stocks:
+                            weights[ticker] = inv_dvols[ticker] / total_inv_dvol
+                    
+                    elif sizing_method == 'inverse_max_drawdown':
+                        # Allocate more to stocks with lower max drawdown
+                        max_drawdowns = {}
+                        for ticker, score in top_stocks:
+                            if ticker in self.data and len(self.data[ticker]) >= 20:
+                                close = self.data[ticker]['Close']
+                                recent_close = close.iloc[-60:] if len(close) > 60 else close
+                                # Calculate max drawdown
+                                rolling_max = recent_close.cummax()
+                                drawdown = (recent_close - rolling_max) / rolling_max
+                                max_dd = abs(drawdown.min())
+                                max_drawdowns[ticker] = max_dd if max_dd > 0.01 else 0.01
+                            else:
+                                max_drawdowns[ticker] = 0.15  # Default 15%
+                        
+                        # Inverse max drawdown weights
+                        inv_mdd = {t: 1/v for t, v in max_drawdowns.items()}
+                        total_inv_mdd = sum(inv_mdd.values())
+                        for ticker, score in top_stocks:
+                            weights[ticker] = inv_mdd[ticker] / total_inv_mdd
+                    
                     elif sizing_method == 'risk_parity':
                         # Equal risk contribution (volatility-adjusted)
                         volatilities = {}
