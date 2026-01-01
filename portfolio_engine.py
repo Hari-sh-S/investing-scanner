@@ -75,11 +75,22 @@ class DataCache:
 
 
 class PortfolioEngine:
-    def __init__(self, universe, start_date, end_date, initial_capital=100000, use_cache=True):
+    def __init__(self, universe, start_date, end_date, initial_capital=100000, use_cache=True, data_source="yahoo"):
+        """Initialize portfolio engine.
+        
+        Args:
+            universe: List of stock symbols
+            start_date: Backtest start date
+            end_date: Backtest end date
+            initial_capital: Initial capital amount
+            use_cache: Whether to use local cache for Yahoo data
+            data_source: "yahoo" for Yahoo Finance or "dhan" for Dhan/Hugging Face data
+        """
         self.universe = universe
         self.start_date = start_date
         self.end_date = end_date
         self.initial_capital = initial_capital
+        self.data_source = data_source  # "yahoo" or "dhan"
         self.data = {}
         self.portfolio_value = []
         self.trades = []
@@ -246,7 +257,85 @@ class PortfolioEngine:
             print(f"Error caching {ticker}: {e}")
 
     def fetch_data(self, progress_callback=None):
-        """Fetch data from cache. Indicators should already be pre-calculated during download."""
+        """Fetch data based on selected data source.
+        
+        Uses Yahoo Finance (with local cache) or Dhan data from Hugging Face.
+        """
+        if self.data_source == "dhan":
+            return self._fetch_from_huggingface(progress_callback)
+        else:
+            return self._fetch_from_yahoo(progress_callback)
+    
+    def _fetch_from_huggingface(self, progress_callback=None):
+        """Fetch data from Hugging Face (Dhan API source)."""
+        print(f"Loading data from Hugging Face for {len(self.universe)} stocks...")
+        
+        try:
+            from huggingface_manager import HuggingFaceManager, is_hf_configured
+            
+            if not is_hf_configured():
+                print("Hugging Face not configured. Falling back to Yahoo Finance.")
+                return self._fetch_from_yahoo(progress_callback)
+            
+            hf = HuggingFaceManager()
+            
+        except Exception as e:
+            print(f"Could not connect to Hugging Face: {e}. Falling back to Yahoo Finance.")
+            return self._fetch_from_yahoo(progress_callback)
+        
+        def clean_dataframe(df, ticker_name="unknown"):
+            """Remove duplicates and ensure clean data."""
+            try:
+                if df is None or df.empty:
+                    return df
+                if hasattr(df.index, 'duplicated') and df.index.duplicated().any():
+                    df = df[~df.index.duplicated(keep='last')]
+                df = df.sort_index()
+                return df
+            except Exception:
+                return df
+        
+        loaded_count = 0
+        for i, ticker in enumerate(self.universe):
+            if progress_callback:
+                progress_callback(i + 1, len(self.universe), ticker)
+            
+            try:
+                df = hf.download_symbol_data(ticker)
+                
+                if df is not None and not df.empty:
+                    # Ensure Date is the index
+                    if 'Date' in df.columns:
+                        df['Date'] = pd.to_datetime(df['Date'])
+                        df.set_index('Date', inplace=True)
+                    
+                    if not isinstance(df.index, pd.DatetimeIndex):
+                        df.index = pd.to_datetime(df.index)
+                    
+                    df = clean_dataframe(df, ticker)
+                    
+                    # Include 300 days BEFORE start_date for indicator lookback
+                    extended_start = pd.Timestamp(self.start_date) - pd.Timedelta(days=300)
+                    mask = (df.index >= extended_start) & (df.index <= pd.Timestamp(self.end_date))
+                    df_filtered = df[mask].copy()
+                    
+                    if not df_filtered.empty and len(df_filtered) >= 100:
+                        self.data[ticker] = df_filtered
+                        loaded_count += 1
+                        
+            except Exception as e:
+                print(f"Error loading {ticker} from HF: {e}")
+        
+        print(f"Successfully loaded {loaded_count} stocks from Hugging Face")
+        
+        # If very few stocks loaded, suggest downloading data first
+        if loaded_count < len(self.universe) * 0.1:
+            print("⚠️ Very few stocks available in HF. Please download Broker API data first (Data Download tab).")
+        
+        return len(self.data) > 0
+    
+    def _fetch_from_yahoo(self, progress_callback=None):
+        """Fetch data from Yahoo Finance with local cache."""
         print(f"Loading data for {len(self.universe)} stocks...")
         tickers_to_download = []
 

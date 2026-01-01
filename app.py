@@ -203,6 +203,14 @@ with main_tabs[0]:
         with exit_col2:
             reinvest_profits = st.checkbox("Reinvest Profits", value=True)
         
+        # Data Source selection
+        data_source = st.selectbox(
+            "Data Source",
+            ["Yahoo Finance", "Broker API (Dhan)"],
+            index=0,
+            help="Yahoo Finance: Free data with potential discrepancies. Broker API: Accurate data from Dhan (requires download first)"
+        )
+        
         use_historical_universe = st.checkbox("Historical Universe (Beta)", value=False,
                                              help="Use point-in-time index constituents to avoid survivorship bias")
         
@@ -446,7 +454,11 @@ with main_tabs[0]:
                 prog_bar = st.progress(0)
                 status_container = st.empty()
                 
-                engine = PortfolioEngine(universe, start_date, end_date, initial_capital)
+                # Map UI data source to engine parameter
+                data_source_map = {"Yahoo Finance": "yahoo", "Broker API (Dhan)": "dhan"}
+                engine_data_source = data_source_map.get(data_source, "yahoo")
+                
+                engine = PortfolioEngine(universe, start_date, end_date, initial_capital, data_source=engine_data_source)
                 if engine.fetch_data(progress_callback=progress_callback):
                     prog_bar.empty()
                     status_container.empty()
@@ -1935,5 +1947,97 @@ with main_tabs[2]:
         total_time = time.time() - start_time
         st.success(f"✅ Downloaded {success_count}/{len(all_tickers)} stocks in {int(total_time)}s!")
         st.balloons()
+
+    # ===== BROKER API DATA DOWNLOAD =====
+    st.markdown("---")
+    st.markdown("### 📊 Broker API Data (Dhan)")
+    st.info("Download historical data from Dhan API and store in Hugging Face for use in backtests. This provides more accurate data than Yahoo Finance.")
+    
+    # Check HF configuration
+    from huggingface_manager import is_hf_configured
+    hf_configured = is_hf_configured()
+    
+    if not hf_configured:
+        st.warning("""
+        ⚠️ **Hugging Face not configured.** To use Broker API data:
+        1. Create a Hugging Face account at [huggingface.co](https://huggingface.co)
+        2. Get a write access token from [Settings > Access Tokens](https://huggingface.co/settings/tokens)
+        3. Create a new dataset repository
+        4. Add to your `.env` file:
+           ```
+           HF_TOKEN=your_token_here
+           HF_DATASET_REPO=your-username/nse-dhan-ohlc
+           ```
+        """)
+    else:
+        # Show current HF dataset status
+        from huggingface_manager import HuggingFaceManager
+        try:
+            hf = HuggingFaceManager()
+            available_symbols = hf.list_available_symbols()
+            st.success(f"✅ Hugging Face connected. **{len(available_symbols)}** symbols available.")
+        except Exception as e:
+            st.error(f"HuggingFace connection error: {e}")
+            available_symbols = []
+        
+        # Download settings
+        dhan_col1, dhan_col2 = st.columns(2)
+        with dhan_col1:
+            dhan_from_date = st.date_input("From Date", datetime.date(2020, 1, 1), key="dhan_from")
+        with dhan_col2:
+            dhan_to_date = st.date_input("To Date", datetime.date.today(), key="dhan_to")
+        
+        if st.button("📥 Download Broker API Data", type="primary", key="download_dhan_data_btn"):
+            # Get all unique tickers from all universes
+            all_tickers = set()
+            all_universe_names = get_all_universe_names()
+            for universe_name in all_universe_names:
+                uni = get_universe(universe_name)
+                all_tickers.update(uni)
+            all_tickers = sorted(list(all_tickers))
+            
+            st.markdown(f"### Syncing {len(all_tickers)} stocks with Hugging Face...")
+            
+            progress_bar = st.progress(0)
+            status_text = st.empty()
+            start_time = time.time()
+            
+            def dhan_progress(current, total, symbol, status):
+                pct = current / total if total > 0 else 0
+                progress_bar.progress(min(pct, 1.0))
+                
+                elapsed = time.time() - start_time
+                elapsed_mins = int(elapsed // 60)
+                elapsed_secs = int(elapsed % 60)
+                
+                status_text.markdown(f"""
+                <div style="padding: 10px; background: rgba(0,255,136,0.1); border-radius: 5px;">
+                    <div style="font-size: 16px; font-weight: bold;">📊 {symbol}</div>
+                    <div>Progress: {current}/{total} ({pct*100:.1f}%)</div>
+                    <div>Status: {status}</div>
+                    <div>⏰ Elapsed: {elapsed_mins:02d}:{elapsed_secs:02d}</div>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            try:
+                hf = HuggingFaceManager()
+                success_count = hf.sync_all_symbols(
+                    symbols=all_tickers,
+                    from_date=dhan_from_date,
+                    to_date=dhan_to_date,
+                    progress_callback=dhan_progress
+                )
+                
+                progress_bar.empty()
+                status_text.empty()
+                
+                total_time = time.time() - start_time
+                st.success(f"✅ Synced {success_count}/{len(all_tickers)} stocks in {int(total_time)}s!")
+                st.balloons()
+                
+            except Exception as e:
+                progress_bar.empty()
+                status_text.empty()
+                st.error(f"❌ Download failed: {e}")
 
 

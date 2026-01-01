@@ -10,3 +10,7 @@ pyarrow>=13.0.0
 nsetools>=2.0.0
 reportlab>=4.0.0
 matplotlib>=3.7.0
+huggingface_hub>=0.20.0
+datasets>=2.16.0
+dhanhq>=2.0.0
+python-dotenv>=1.0.0
