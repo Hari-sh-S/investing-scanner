@@ -5,7 +5,6 @@ Uses official dhanhq SDK for authentication
 
 import os
 from dotenv import load_dotenv
-from dhanhq import DhanContext, dhanhq
 
 # Load environment variables from .env file
 load_dotenv()
@@ -25,12 +24,15 @@ def validate_credentials():
 
 
 def get_dhan_client():
-    """Get authenticated Dhan client using official SDK"""
+    """Get authenticated Dhan client using official SDK.
+    
+    The dhanhq SDK has evolved - newer versions use direct initialization
+    with client_id and access_token parameters.
+    """
     validate_credentials()
     
-    context = DhanContext(
-        client_id=DHAN_CLIENT_ID,
-        access_token=DHAN_ACCESS_TOKEN
-    )
+    # Import here to handle version differences
+    from dhanhq import dhanhq
     
-    return dhanhq(context)
+    # Current dhanhq SDK (v2.x) uses direct initialization
+    return dhanhq(DHAN_CLIENT_ID, DHAN_ACCESS_TOKEN)
