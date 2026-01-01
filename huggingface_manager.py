@@ -198,9 +198,12 @@ class HuggingFaceManager:
         to_date: date,
         progress_callback: Optional[Callable[[int, int, str, str], None]] = None
     ) -> int:
-        """Sync data for all symbols - fetch from Dhan and upload to HF.
+        """Sync data for all symbols using BATCH UPLOAD (1 commit).
         
-        Only fetches missing date ranges for each symbol.
+        This method:
+        1. Fetches all data from Dhan API
+        2. Saves to local temp folder
+        3. Uploads entire folder in ONE commit (avoids rate limits)
         
         Args:
             symbols: List of stock symbols
@@ -209,50 +212,96 @@ class HuggingFaceManager:
             progress_callback: Callback(current, total, symbol, status)
             
         Returns:
-            Number of symbols successfully synced
+            Number of symbols successfully fetched
         """
         from dhan_data_fetcher import fetch_historical_data
+        from huggingface_hub import upload_folder
+        import tempfile
+        import shutil
         import time
+        
+        # Create temp directory for batch collection
+        temp_dir = Path(tempfile.mkdtemp(prefix="dhan_batch_"))
+        data_dir = temp_dir / "data"
+        data_dir.mkdir(exist_ok=True)
         
         success_count = 0
         
-        for i, symbol in enumerate(symbols):
-            try:
-                if progress_callback:
-                    progress_callback(i + 1, len(symbols), symbol, "Checking...")
-                
-                # Get missing date ranges
-                gaps = self.get_missing_dates(symbol, from_date, to_date)
-                
-                if not gaps:
+        try:
+            # Phase 1: Fetch all data from Dhan and save locally
+            if progress_callback:
+                progress_callback(0, len(symbols), "Starting", "Phase 1: Fetching from Dhan API...")
+            
+            for i, symbol in enumerate(symbols):
+                try:
                     if progress_callback:
-                        progress_callback(i + 1, len(symbols), symbol, "Up to date ✓")
-                    success_count += 1
-                    continue
-                
-                # Fetch data for each gap
-                for gap_start, gap_end in gaps:
-                    if progress_callback:
-                        progress_callback(i + 1, len(symbols), symbol, 
-                                        f"Fetching {gap_start} to {gap_end}")
+                        progress_callback(i + 1, len(symbols), symbol, "Fetching from Dhan...")
                     
-                    new_data = fetch_historical_data(symbol, gap_start, gap_end)
+                    # Fetch data from Dhan
+                    new_data = fetch_historical_data(symbol, from_date, to_date)
                     
                     if new_data is not None and not new_data.empty:
-                        # Sync with HF
-                        if progress_callback:
-                            progress_callback(i + 1, len(symbols), symbol, "Uploading...")
+                        # Try to merge with existing HF data
+                        try:
+                            existing = self.download_symbol_data(symbol)
+                            if existing is not None and not existing.empty:
+                                combined = pd.concat([existing, new_data], ignore_index=True)
+                                combined = combined.drop_duplicates(subset=['Date'], keep='last')
+                                combined = combined.sort_values('Date').reset_index(drop=True)
+                            else:
+                                combined = new_data.sort_values('Date').reset_index(drop=True)
+                        except:
+                            combined = new_data.sort_values('Date').reset_index(drop=True)
                         
-                        if self.sync_symbol(symbol, new_data):
-                            success_count += 1
+                        # Save to local temp folder
+                        file_path = data_dir / f"{symbol}.parquet"
+                        combined.to_parquet(file_path, index=False)
+                        success_count += 1
+                        
+                        if progress_callback:
+                            progress_callback(i + 1, len(symbols), symbol, f"Saved ✓ ({len(combined)} days)")
+                    else:
+                        if progress_callback:
+                            progress_callback(i + 1, len(symbols), symbol, "No data from Dhan")
                     
-                    # Rate limiting
-                    time.sleep(0.5)
-                
-            except Exception as e:
-                print(f"Error syncing {symbol}: {e}")
+                    # Small delay to avoid rate limiting
+                    time.sleep(0.3)
+                    
+                except Exception as e:
+                    print(f"Error fetching {symbol}: {e}")
+                    if progress_callback:
+                        progress_callback(i + 1, len(symbols), symbol, f"Error: {str(e)[:30]}")
+            
+            # Phase 2: Upload entire folder in ONE commit
+            if success_count > 0:
                 if progress_callback:
-                    progress_callback(i + 1, len(symbols), symbol, f"Error: {e}")
+                    progress_callback(len(symbols), len(symbols), "Uploading", 
+                                    f"Phase 2: Uploading {success_count} files in 1 commit...")
+                
+                try:
+                    upload_folder(
+                        folder_path=str(temp_dir),
+                        repo_id=self.repo_id,
+                        repo_type="dataset",
+                        token=self.token,
+                        commit_message=f"Batch upload: {success_count} symbols ({from_date} to {to_date})"
+                    )
+                    
+                    if progress_callback:
+                        progress_callback(len(symbols), len(symbols), "Complete", 
+                                        f"✅ Uploaded {success_count} symbols in 1 commit!")
+                except Exception as e:
+                    print(f"Error uploading folder: {e}")
+                    if progress_callback:
+                        progress_callback(len(symbols), len(symbols), "Upload Error", str(e)[:50])
+                    return 0
+            
+        finally:
+            # Cleanup temp directory
+            try:
+                shutil.rmtree(temp_dir)
+            except:
+                pass
         
         return success_count
     
@@ -299,3 +348,4 @@ if __name__ == "__main__":
         
         if symbols:
             print(f"First 10: {symbols[:10]}")
+
