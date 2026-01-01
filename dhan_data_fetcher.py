@@ -176,23 +176,38 @@ def fetch_historical_data(
             print(f"Dhan API error for {symbol}: {response.get('remarks', 'Unknown error')}")
             return None
         
-        data = response.get('data', [])
+        data = response.get('data', {})
         if not data:
             print(f"No data returned for {symbol}")
             return None
         
+        # Dhan API returns dict with parallel arrays:
+        # {'open': [...], 'high': [...], 'low': [...], 'close': [...], 'volume': [...], 'timestamp': [...]}
+        # Timestamps are standard Unix epoch (seconds since 1970-01-01)
+        
+        timestamps = data.get('timestamp', [])
+        opens = data.get('open', [])
+        highs = data.get('high', [])
+        lows = data.get('low', [])
+        closes = data.get('close', [])
+        volumes = data.get('volume', [])
+        
+        if not timestamps:
+            print(f"No timestamp data for {symbol}")
+            return None
+        
         # Convert to DataFrame
         records = []
-        for candle in data:
-            # Dhan returns: [timestamp, open, high, low, close, volume]
-            ts = _convert_dhan_timestamp(candle[0])
+        for i in range(len(timestamps)):
+            # Convert Unix timestamp to datetime
+            ts = datetime.fromtimestamp(timestamps[i])
             records.append({
                 'Date': ts.date(),
-                'Open': float(candle[1]),
-                'High': float(candle[2]),
-                'Low': float(candle[3]),
-                'Close': float(candle[4]),
-                'Volume': int(candle[5]) if len(candle) > 5 else 0
+                'Open': float(opens[i]) if i < len(opens) else 0,
+                'High': float(highs[i]) if i < len(highs) else 0,
+                'Low': float(lows[i]) if i < len(lows) else 0,
+                'Close': float(closes[i]) if i < len(closes) else 0,
+                'Volume': int(volumes[i]) if i < len(volumes) else 0
             })
         
         df = pd.DataFrame(records)

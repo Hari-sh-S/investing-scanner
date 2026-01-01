@@ -26,13 +26,36 @@ def validate_credentials():
 def get_dhan_client():
     """Get authenticated Dhan client using official SDK.
     
-    The dhanhq SDK has evolved - newer versions use direct initialization
-    with client_id and access_token parameters.
+    Handles different SDK versions:
+    - Older versions: use DhanContext + dhanhq(context)
+    - Newer versions: use dhanhq(client_id, access_token) directly
     """
     validate_credentials()
     
-    # Import here to handle version differences
-    from dhanhq import dhanhq
-    
-    # Current dhanhq SDK (v2.x) uses direct initialization
-    return dhanhq(DHAN_CLIENT_ID, DHAN_ACCESS_TOKEN)
+    # Try newer SDK first (2 args: client_id, access_token)
+    try:
+        from dhanhq import dhanhq
+        # Check if it accepts 2 args by looking at signature
+        import inspect
+        sig = inspect.signature(dhanhq.__init__)
+        params = list(sig.parameters.keys())
+        
+        if 'dhan_context' in params:
+            # Old version - needs DhanContext
+            from dhanhq import DhanContext
+            context = DhanContext(DHAN_CLIENT_ID, DHAN_ACCESS_TOKEN)
+            return dhanhq(context)
+        else:
+            # New version - direct init
+            return dhanhq(DHAN_CLIENT_ID, DHAN_ACCESS_TOKEN)
+    except Exception as e:
+        # Fallback: try DhanContext approach
+        try:
+            from dhanhq import DhanContext, dhanhq
+            context = DhanContext(DHAN_CLIENT_ID, DHAN_ACCESS_TOKEN)
+            return dhanhq(context)
+        except Exception:
+            # Last fallback: try direct 2-arg init
+            from dhanhq import dhanhq
+            return dhanhq(DHAN_CLIENT_ID, DHAN_ACCESS_TOKEN)
+
