@@ -181,3 +181,4 @@ def get_display_name(index_name):
 def get_broad_market_universes():
     """Get all broad market indices (all 19)."""
     return INDEX_NAMES.copy()
+

@@ -6,9 +6,7 @@ from plotly.subplots import make_subplots
 from engine import BacktestEngine
 from portfolio_engine import PortfolioEngine
 from scoring import ScoreParser
-from nifty_universe import (get_all_universe_names, get_universe, 
-                            get_broad_market_universes, get_sectoral_universes,
-                            get_cap_based_universes, get_thematic_universes)
+from nifty_universe import get_all_universe_names, get_universe, get_broad_market_universes
 from report_generator import create_excel_with_charts, create_pdf_report, prepare_complete_log_data
 from monte_carlo import MonteCarloSimulator, extract_trade_pnls, PortfolioMonteCarloSimulator, extract_monthly_returns
 import datetime
