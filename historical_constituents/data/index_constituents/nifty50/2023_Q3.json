@@ -1,9 +1,11 @@
 {
     "index": "NIFTY50",
-    "effective_date": "2022-03-31",
-    "quarter": "2022_Q1",
+    "effective_date": "2023-07-13",
+    "quarter": "2023_Q3",
     "symbols": [
+        "ADANIENT",
         "ADANIPORTS",
+        "APOLLOHOSP",
         "ASIANPAINT",
         "AXISBANK",
         "BAJAJ-AUTO",
@@ -29,7 +31,6 @@
         "ICICIBANK",
         "INDUSINDBK",
         "INFY",
-        "IOC",
         "ITC",
         "JSWSTEEL",
         "KOTAKBANK",
@@ -43,7 +44,6 @@
         "RELIANCE",
         "SBILIFE",
         "SBIN",
-        "SHREECEM",
         "SUNPHARMA",
         "TATACONSUM",
         "TATASTEEL",
@@ -57,6 +57,6 @@
     "metadata": {
         "source": "Generated from changes data",
         "generated_at": "2026-01-02T14:17:09.305156",
-        "change_reversed": "Before 2022-03-31 change"
+        "change_reversed": "Before 2023-07-13 change"
     }
 }

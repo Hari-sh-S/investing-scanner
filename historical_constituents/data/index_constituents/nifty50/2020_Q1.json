@@ -1,6 +1,6 @@
 {
     "index": "NIFTY50",
-    "effective_date": "2020-01-01",
+    "effective_date": "2020-03-19",
     "quarter": "2020_Q1",
     "symbols": [
         "ADANIPORTS",
@@ -16,17 +16,18 @@
         "COALINDIA",
         "DRREDDY",
         "EICHERMOT",
+        "ETERNAL",
         "GAIL",
         "GRASIM",
         "HCLTECH",
         "HDFC",
         "HDFCBANK",
-        "HDFCLIFE",
         "HEROMOTOCO",
         "HINDALCO",
         "HINDUNILVR",
         "ICICIBANK",
         "INDUSINDBK",
+        "INFRATEL",
         "INFY",
         "IOC",
         "ITC",
@@ -41,9 +42,7 @@
         "POWERGRID",
         "RELIANCE",
         "SBIN",
-        "SHREECEM",
         "SUNPHARMA",
-        "TATAMOTORS",
         "TATASTEEL",
         "TCS",
         "TECHM",
@@ -52,12 +51,12 @@
         "UPL",
         "VEDL",
         "WIPRO",
+        "YESBANK",
         "ZEEL"
     ],
-    "isins": [],
     "metadata": {
-        "source": "NSE Website - NIFTY 50 Index Constituents (Historical)",
-        "parsed_at": "2024-12-19",
-        "notes": "Q1 2020 - Significantly different: GAIL, VEDL, ZEEL in; many others out"
+        "source": "Generated from changes data",
+        "generated_at": "2026-01-02T14:17:09.305156",
+        "change_reversed": "Before 2020-03-19 change"
     }
 }

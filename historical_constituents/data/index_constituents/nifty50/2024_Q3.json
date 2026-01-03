@@ -1,9 +1,11 @@
 {
     "index": "NIFTY50",
-    "effective_date": "2022-03-31",
-    "quarter": "2022_Q1",
+    "effective_date": "2024-09-30",
+    "quarter": "2024_Q3",
     "symbols": [
+        "ADANIENT",
         "ADANIPORTS",
+        "APOLLOHOSP",
         "ASIANPAINT",
         "AXISBANK",
         "BAJAJ-AUTO",
@@ -20,7 +22,6 @@
         "ETERNAL",
         "GRASIM",
         "HCLTECH",
-        "HDFC",
         "HDFCBANK",
         "HDFCLIFE",
         "HEROMOTOCO",
@@ -29,11 +30,11 @@
         "ICICIBANK",
         "INDUSINDBK",
         "INFY",
-        "IOC",
         "ITC",
         "JSWSTEEL",
         "KOTAKBANK",
         "LT",
+        "LTIM",
         "M&M",
         "MARUTI",
         "NESTLEIND",
@@ -43,7 +44,7 @@
         "RELIANCE",
         "SBILIFE",
         "SBIN",
-        "SHREECEM",
+        "SHRIRAMFIN",
         "SUNPHARMA",
         "TATACONSUM",
         "TATASTEEL",
@@ -51,12 +52,11 @@
         "TECHM",
         "TITAN",
         "ULTRACEMCO",
-        "UPL",
         "WIPRO"
     ],
     "metadata": {
         "source": "Generated from changes data",
         "generated_at": "2026-01-02T14:17:09.305156",
-        "change_reversed": "Before 2022-03-31 change"
+        "change_reversed": "Before 2024-09-30 change"
     }
 }

@@ -1,66 +1,52 @@
-# NIFTY Universe Data - 55 NSE Indexes
-# Last Updated: 2025-12-13
-# Source: NSE official indices - using exact API names
+# NIFTY Universe Data - 19 Broad Market Indices Only
+# Last Updated: 2026-01-03
+# Source: https://www.niftyindices.com/reports/index-factsheet
 
-# Base stock lists - will be dynamically fetched from NSE cache
-# These are placeholders that get populated from nse_universe_cache.json
-
-# All 55 indexes using exact NSE API names
+# All 19 Broad Market Indices using exact NSE API names
 INDEX_NAMES = [
     "NIFTY 50",
     "NIFTY NEXT 50",
-    "NIFTY BANK",
-    "NIFTY FIN SERVICE",      # NSE API name for Financial Services
-    "NIFTY MID SELECT",       # NSE API name for Midcap Select
     "NIFTY 100",
     "NIFTY 200",
     "NIFTY 500",
-    "NIFTY MIDCAP 50",
-    "NIFTY MIDCAP 100",
     "NIFTY MIDCAP 150",
-    "NIFTY SMLCAP 100",       # NSE API name for Smallcap 100
-    "NIFTY SMLCAP 50",        # NSE API name for Smallcap 50
-    "NIFTY SMLCAP 250",       # NSE API name for Smallcap 250
-    "NIFTY MIDSML 400",       # NSE API name for Midsmallcap 400
-    "NIFTY500 MULTICAP",      # NSE API name for Multicap 50:25:25
-    "NIFTY LARGEMID250",      # NSE API name for Largemidcap 250
-    "NIFTY TOTAL MKT",        # NSE API name for Total Market
-    "NIFTY MICROCAP250",      # NSE API name for Microcap 250
-    "NIFTY500 LMS EQL",       # NSE API name for LMS Equal-Cap
-    "NIFTY FPI 150",          # NSE API name for India FPI 150
-    "NIFTY ALPHA 50",
-    "NIFTY50 EQL WGT",        # NSE API name for Nifty50 Equal Weight
-    "NIFTY100 EQL WGT",       # NSE API name for Nifty100 Equal Weight
-    "NIFTY100 LOWVOL30",      # NSE API name for Low Volatility 30
-    "NIFTY200 QUALTY30",      # NSE API name for Quality 30
-    "NIFTY ALPHALOWVOL",      # NSE API name for Alpha Low-Vol 30
-    "NIFTY200MOMENTM30",      # NSE API name for Momentum 30
-    "NIFTY M150 QLTY50",      # NSE API name for Midcap150 Quality 50
-    "NIFTY200 ALPHA 30",
-    "NIFTYM150MOMNTM50",      # NSE API name for Midcap150 Momentum 50
-    "NIFTY500MOMENTM50",      # NSE API name for Nifty500 Momentum 50
-    "NIFTYMS400 MQ 100",      # NSE API name for Midsmall400 MQ 100
-    "NIFTYSML250MQ 100",      # NSE API name for Smallcap250 MQ 100
-    "NIFTY TOP 10 EW",        # NSE API name for Top 10 EW
-    "NIFTY AQL 30",           # NSE API name for Alpha Quality LV 30
-    "NIFTY AQLV 30",          # NSE API name for Alpha Quality Value LV 30
-    "NIFTY HIGHBETA 50",      # NSE API name for High Beta 50
-    "NIFTY LOW VOL 50",       # NSE API name for Low Volatility 50
-    "NIFTY QLTY LV 30",       # NSE API name for Quality Low-Vol 30
-    "NIFTY SML250 Q50",       # NSE API name for Smallcap250 Quality 50
-    "NIFTY TOP 15 EW",        # NSE API name for Top 15 EW
-    "NIFTY100 ALPHA 30",
-    "NIFTY200 VALUE 30",
-    "NIFTY500 EW",            # NSE API name for Nifty500 Equal Weight
-    "NIFTY MULTI MQ 50",      # NSE API name for Multicap MQ 50
-    "NIFTY500 VALUE 50",
-    "NIFTY TOP 20 EW",        # NSE API name for Top 20 EW
-    "NIFTY500 QLTY50",        # NSE API name for Nifty500 Quality 50
-    "NIFTY500 LOWVOL50",      # NSE API name for Nifty500 Low Vol 50
-    "NIFTY500 MQVLV50",       # NSE API name for Multifactor MQVLV
-    "NIFTY500 FLEXICAP",      # NSE API name for Flexicap Quality 30
-    "NIFTY TMMQ 50",          # NSE API name for Total Market MQ 50
+    "NIFTY MIDCAP 50",
+    "NIFTY MID SELECT",           # NSE API name for Midcap Select
+    "NIFTY MIDCAP 100",
+    "NIFTY SMLCAP 250",           # NSE API name for Smallcap 250
+    "NIFTY SMLCAP 50",            # NSE API name for Smallcap 50
+    "NIFTY SMLCAP 100",           # NSE API name for Smallcap 100
+    "NIFTY LARGEMID250",          # NSE API name for LargeMidcap 250
+    "NIFTY MIDSML 400",           # NSE API name for MidSmallcap 400
+    "NIFTY500 MULTICAP",          # NSE API name for Multicap 50:25:25
+    "NIFTY MICROCAP250",          # NSE API name for Microcap 250
+    "NIFTY TOTAL MKT",            # NSE API name for Total Market
+    "NIFTY500 LMS EQL",           # NSE API name for LMS Equal-Cap Weighted
+    "NIFTY FPI 150",              # NSE API name for India FPI 150
 ]
+
+# Display names for UI (maps to INDEX_NAMES)
+DISPLAY_NAMES = {
+    "NIFTY 50": "Nifty 50",
+    "NIFTY NEXT 50": "Nifty Next 50",
+    "NIFTY 100": "Nifty 100",
+    "NIFTY 200": "Nifty 200",
+    "NIFTY 500": "Nifty 500",
+    "NIFTY MIDCAP 150": "Nifty Midcap 150",
+    "NIFTY MIDCAP 50": "Nifty Midcap 50",
+    "NIFTY MID SELECT": "Nifty Midcap Select",
+    "NIFTY MIDCAP 100": "Nifty Midcap 100",
+    "NIFTY SMLCAP 250": "Nifty Smallcap 250",
+    "NIFTY SMLCAP 50": "Nifty Smallcap 50",
+    "NIFTY SMLCAP 100": "Nifty Smallcap 100",
+    "NIFTY LARGEMID250": "Nifty LargeMidcap 250",
+    "NIFTY MIDSML 400": "Nifty MidSmallcap 400",
+    "NIFTY500 MULTICAP": "Nifty 500 Multicap 50:25:25",
+    "NIFTY MICROCAP250": "Nifty Microcap 250",
+    "NIFTY TOTAL MKT": "Nifty Total Market",
+    "NIFTY500 LMS EQL": "Nifty500 LargeMidSmall Equal-Cap Weighted",
+    "NIFTY FPI 150": "Nifty India FPI 150",
+}
 
 # Fallback stock lists for key indexes (used when NSE cache is unavailable)
 NIFTY_50 = [
@@ -89,73 +75,31 @@ NIFTY_NEXT_50 = [
     "PGHH", "PETRONET", "PFC", "INDHOTEL", "BAJAJHLDNG"
 ]
 
-NIFTY_BANK = [
-    "HDFCBANK", "ICICIBANK", "SBIN", "KOTAKBANK", "AXISBANK",
-    "INDUSINDBK", "BANDHANBNK", "FEDERALBNK", "PNB", "IDFCFIRSTB",
-    "AUBANK", "BANKBARODA"
-]
-
 NIFTY_100 = list(dict.fromkeys(NIFTY_50 + NIFTY_NEXT_50))
 
-# Universe dictionary - all 60 indexes
+# Universe dictionary - 19 Broad Market Indices
 UNIVERSES = {name: [] for name in INDEX_NAMES}
 
-# Populate key fallback lists
+# Populate fallback lists
 UNIVERSES["NIFTY 50"] = NIFTY_50
 UNIVERSES["NIFTY NEXT 50"] = NIFTY_NEXT_50
-UNIVERSES["NIFTY BANK"] = NIFTY_BANK
 UNIVERSES["NIFTY 100"] = NIFTY_100
-UNIVERSES["NIFTY FINANCIAL SERVICES"] = list(dict.fromkeys(NIFTY_BANK + ["BAJFINANCE", "BAJAJFINSV", "SBILIFE", "HDFCLIFE", "ICICIGI", "SHRIRAMFIN"]))
-UNIVERSES["NIFTY MIDCAP SELECT"] = NIFTY_NEXT_50[:25]
 UNIVERSES["NIFTY 200"] = NIFTY_100
 UNIVERSES["NIFTY 500"] = NIFTY_100
-UNIVERSES["NIFTY MIDCAP 50"] = NIFTY_NEXT_50[:50]
-UNIVERSES["NIFTY MIDCAP 100"] = NIFTY_NEXT_50
 UNIVERSES["NIFTY MIDCAP 150"] = NIFTY_NEXT_50
-UNIVERSES["NIFTY SMALLCAP 100"] = NIFTY_NEXT_50
-UNIVERSES["NIFTY SMALLCAP 50"] = NIFTY_NEXT_50[:50]
-UNIVERSES["NIFTY SMALLCAP 250"] = NIFTY_100
-UNIVERSES["NIFTY MIDSMALLCAP 400"] = NIFTY_100
-UNIVERSES["NIFTY500 MULTICAP 50:25:25"] = NIFTY_100
-UNIVERSES["NIFTY LARGEMIDCAP 250"] = NIFTY_100
-UNIVERSES["NIFTY TOTAL MARKET"] = NIFTY_100
-UNIVERSES["NIFTY MICROCAP 250"] = NIFTY_NEXT_50
-UNIVERSES["NIFTY500 LARGEMIDSMALL EQUAL-CAP WEIGHTED"] = NIFTY_100
-UNIVERSES["NIFTY INDIA FPI 150"] = NIFTY_100
-UNIVERSES["NIFTY50 DIVIDEND POINTS"] = NIFTY_50[:20]
-UNIVERSES["NIFTY ALPHA 50"] = NIFTY_50
-UNIVERSES["NIFTY50 EQUAL WEIGHT"] = NIFTY_50
-UNIVERSES["NIFTY100 EQUAL WEIGHT"] = NIFTY_100
-UNIVERSES["NIFTY100 LOW VOLATILITY 30"] = NIFTY_50[:30]
-UNIVERSES["NIFTY200 QUALITY 30"] = NIFTY_50[:30]
-UNIVERSES["NIFTY ALPHA LOW-VOLATILITY 30"] = NIFTY_50[:30]
-UNIVERSES["NIFTY200 MOMENTUM 30"] = NIFTY_50[:30]
-UNIVERSES["NIFTY MIDCAP150 QUALITY 50"] = NIFTY_NEXT_50[:50]
-UNIVERSES["NIFTY200 ALPHA 30"] = NIFTY_50[:30]
-UNIVERSES["NIFTY MIDCAP150 MOMENTUM 50"] = NIFTY_NEXT_50[:50]
-UNIVERSES["NIFTY500 MOMENTUM 50"] = NIFTY_50
-UNIVERSES["NIFTY MIDSMALLCAP400 MOMENTUM QUALITY 100"] = NIFTY_100
-UNIVERSES["NIFTY SMALLCAP250 MOMENTUM QUALITY 100"] = NIFTY_100
-UNIVERSES["NIFTY TOP 10 EQUAL WEIGHT"] = NIFTY_50[:10]
-UNIVERSES["NIFTY ALPHA QUALITY LOW-VOLATILITY 30"] = NIFTY_50[:30]
-UNIVERSES["NIFTY ALPHA QUALITY VALUE LOW-VOLATILITY 30"] = NIFTY_50[:30]
-UNIVERSES["NIFTY HIGH BETA 50"] = NIFTY_50
-UNIVERSES["NIFTY LOW VOLATILITY 50"] = NIFTY_50
-UNIVERSES["NIFTY QUALITY LOW-VOLATILITY 30"] = NIFTY_50[:30]
-UNIVERSES["NIFTY SMALLCAP250 QUALITY 50"] = NIFTY_NEXT_50[:50]
-UNIVERSES["NIFTY TOP 15 EQUAL WEIGHT"] = NIFTY_50[:15]
-UNIVERSES["NIFTY100 ALPHA 30"] = NIFTY_50[:30]
-UNIVERSES["NIFTY200 VALUE 30"] = NIFTY_50[:30]
-UNIVERSES["NIFTY500 EQUAL WEIGHT"] = NIFTY_100
-UNIVERSES["NIFTY500 MULTICAP MOMENTUM QUALITY 50"] = NIFTY_50
-UNIVERSES["NIFTY500 VALUE 50"] = NIFTY_50
-UNIVERSES["NIFTY TOP 20 EQUAL WEIGHT"] = NIFTY_50[:20]
-UNIVERSES["NIFTY500 QUALITY 50"] = NIFTY_50
-UNIVERSES["NIFTY500 LOW VOLATILITY 50"] = NIFTY_50
-UNIVERSES["NIFTY500 MULTIFACTOR MQVLV 50"] = NIFTY_50
-UNIVERSES["NIFTY50 USD"] = NIFTY_50
-UNIVERSES["NIFTY500 FLEXICAP QUALITY 30"] = NIFTY_50[:30]
-UNIVERSES["NIFTY TOTAL MARKET MOMENTUM QUALITY 50"] = NIFTY_50
+UNIVERSES["NIFTY MIDCAP 50"] = NIFTY_NEXT_50[:50]
+UNIVERSES["NIFTY MID SELECT"] = NIFTY_NEXT_50[:25]
+UNIVERSES["NIFTY MIDCAP 100"] = NIFTY_NEXT_50
+UNIVERSES["NIFTY SMLCAP 250"] = NIFTY_100
+UNIVERSES["NIFTY SMLCAP 50"] = NIFTY_NEXT_50[:50]
+UNIVERSES["NIFTY SMLCAP 100"] = NIFTY_NEXT_50
+UNIVERSES["NIFTY LARGEMID250"] = NIFTY_100
+UNIVERSES["NIFTY MIDSML 400"] = NIFTY_100
+UNIVERSES["NIFTY500 MULTICAP"] = NIFTY_100
+UNIVERSES["NIFTY MICROCAP250"] = NIFTY_NEXT_50
+UNIVERSES["NIFTY TOTAL MKT"] = NIFTY_100
+UNIVERSES["NIFTY500 LMS EQL"] = NIFTY_100
+UNIVERSES["NIFTY FPI 150"] = NIFTY_100
 
 
 def _load_nse_cache():
@@ -225,37 +169,15 @@ def _get_current_universe(name):
 
 
 def get_all_universe_names():
-    """Get all available universe names in the specified order."""
+    """Get all available universe names (19 Broad Market Indices)."""
     return INDEX_NAMES.copy()
 
 
+def get_display_name(index_name):
+    """Get user-friendly display name for an index."""
+    return DISPLAY_NAMES.get(index_name, index_name)
+
+
 def get_broad_market_universes():
-    """Get broad market indices."""
-    return [
-        "NIFTY 50", "NIFTY NEXT 50", "NIFTY BANK", "NIFTY FINANCIAL SERVICES",
-        "NIFTY MIDCAP SELECT", "NIFTY 100", "NIFTY 200", "NIFTY 500"
-    ]
-
-
-def get_sectoral_universes():
-    """Get sectoral/thematic indices (now just a subset of key indexes)."""
-    return [
-        "NIFTY BANK", "NIFTY FINANCIAL SERVICES", "NIFTY MIDCAP SELECT"
-    ]
-
-
-def get_cap_based_universes():
-    """Get cap-based indices."""
-    return [
-        "NIFTY MIDCAP 50", "NIFTY MIDCAP 100", "NIFTY MIDCAP 150",
-        "NIFTY SMALLCAP 50", "NIFTY SMALLCAP 100", "NIFTY SMALLCAP 250",
-        "NIFTY MIDSMALLCAP 400", "NIFTY MICROCAP 250"
-    ]
-
-
-def get_thematic_universes():
-    """Get strategy/factor indices."""
-    return [
-        "NIFTY ALPHA 50", "NIFTY HIGH BETA 50", "NIFTY LOW VOLATILITY 50",
-        "NIFTY500 MOMENTUM 50", "NIFTY500 QUALITY 50", "NIFTY500 VALUE 50"
-    ]
+    """Get all broad market indices (all 19)."""
+    return INDEX_NAMES.copy()

@@ -1,0 +1,284 @@
+{
+    "index": "NIFTY50",
+    "source": "Official NSE Press Releases (nsearchives.nseindia.com), news sources",
+    "methodology": "Semi-annual review with Jan 31 and July 31 cutoffs. Changes effective last working day of March and September. Special changes may occur mid-period for mergers, delistings, etc.",
+    "notes": "Data verified from official NSE press release PDFs for 2015-2017. April 2016-Sept 2017: Index had 51 securities due to Tata Motors DVR addition. ETERNAL is Zomato rebranded in Feb 2025.",
+    "last_updated": "2026-01-02",
+    "changes": [
+        {
+            "effective_date": "2025-09-30",
+            "additions": [
+                "INDIGO",
+                "MAXHEALTH"
+            ],
+            "exclusions": [
+                "HEROMOTOCO",
+                "INDUSINDBK"
+            ],
+            "source": "economictimes.com, tradebrains.in"
+        },
+        {
+            "effective_date": "2025-03-28",
+            "additions": [
+                "ZOMATO",
+                "JIOFIN"
+            ],
+            "exclusions": [
+                "BPCL",
+                "BRITANNIA"
+            ],
+            "notes": "Zomato rebranded to ETERNAL in Feb 2025",
+            "source": "niftyindices.com, tradingqna.com"
+        },
+        {
+            "effective_date": "2024-09-30",
+            "additions": [
+                "TRENT",
+                "BEL"
+            ],
+            "exclusions": [
+                "DIVISLAB",
+                "LTIM"
+            ],
+            "source": "niftyindices.com, icicidirect.com"
+        },
+        {
+            "effective_date": "2024-03-28",
+            "additions": [
+                "SHRIRAMFIN"
+            ],
+            "exclusions": [
+                "UPL"
+            ],
+            "source": "niftyindices.com, investing.com"
+        },
+        {
+            "effective_date": "2023-09-29",
+            "additions": [],
+            "exclusions": [],
+            "notes": "No changes announced",
+            "source": "angelone.in"
+        },
+        {
+            "effective_date": "2023-07-13",
+            "additions": [
+                "LTIM"
+            ],
+            "exclusions": [
+                "HDFC"
+            ],
+            "notes": "HDFC merged with HDFC Bank. LTIMindtree (LTIM) replaced HDFC Ltd.",
+            "source": "livemint.com, angelone.in"
+        },
+        {
+            "effective_date": "2023-03-31",
+            "additions": [],
+            "exclusions": [],
+            "notes": "No changes",
+            "source": "Verified"
+        },
+        {
+            "effective_date": "2022-09-30",
+            "additions": [
+                "ADANIENT"
+            ],
+            "exclusions": [
+                "SHREECEM"
+            ],
+            "source": "livemint.com, tradingqna.com"
+        },
+        {
+            "effective_date": "2022-03-31",
+            "additions": [
+                "APOLLOHOSP"
+            ],
+            "exclusions": [
+                "IOC"
+            ],
+            "source": "financialexpress.com, niftyindices.com"
+        },
+        {
+            "effective_date": "2021-09-30",
+            "additions": [],
+            "exclusions": [],
+            "notes": "No changes announced",
+            "source": "smartkarma.com"
+        },
+        {
+            "effective_date": "2021-03-31",
+            "additions": [
+                "TATACONSUM"
+            ],
+            "exclusions": [
+                "GAIL"
+            ],
+            "source": "livemint.com, indiatvnews.com"
+        },
+        {
+            "effective_date": "2020-09-25",
+            "additions": [
+                "SBILIFE",
+                "DIVISLAB"
+            ],
+            "exclusions": [
+                "INFRATEL",
+                "ZEEL"
+            ],
+            "notes": "SBI Life and Divi's Labs added",
+            "source": "goodreturns.in, economictimes.com"
+        },
+        {
+            "effective_date": "2020-07-31",
+            "additions": [
+                "HDFCLIFE"
+            ],
+            "exclusions": [
+                "VEDL"
+            ],
+            "notes": "HDFC Life replaced Vedanta",
+            "source": "moneyworks4me.com, business-standard.com"
+        },
+        {
+            "effective_date": "2020-03-19",
+            "additions": [
+                "SHREECEM"
+            ],
+            "exclusions": [
+                "YESBANK"
+            ],
+            "notes": "Emergency removal of Yes Bank accelerated to March 19",
+            "source": "niftyindices.com"
+        },
+        {
+            "effective_date": "2019-09-27",
+            "additions": [
+                "NESTLEIND"
+            ],
+            "exclusions": [
+                "IBULHSGFIN"
+            ],
+            "notes": "Nestle India added, Indiabulls Housing Finance removed",
+            "source": "cleartax.in, ndtvprofit.com"
+        },
+        {
+            "effective_date": "2019-03-29",
+            "additions": [
+                "BRITANNIA"
+            ],
+            "exclusions": [
+                "HINDPETRO"
+            ],
+            "notes": "Britannia Industries replaced HPCL",
+            "source": "equitypandit.com, economictimes.com, livemint.com"
+        },
+        {
+            "effective_date": "2018-09-28",
+            "additions": [
+                "JSWSTEEL"
+            ],
+            "exclusions": [
+                "LUPIN"
+            ],
+            "source": "enrichmoney.in, scribd.com"
+        },
+        {
+            "effective_date": "2018-04-02",
+            "additions": [
+                "TITAN",
+                "BAJAJFINSV",
+                "GRASIM"
+            ],
+            "exclusions": [
+                "VEDL",
+                "BOSCHLTD",
+                "AUROPHARMA"
+            ],
+            "notes": "Grasim re-added after May 2017 removal",
+            "source": "scribd.com, motilaloswal.com"
+        },
+        {
+            "effective_date": "2017-09-29",
+            "additions": [
+                "BAJFINANCE",
+                "HINDPETRO",
+                "UPL"
+            ],
+            "exclusions": [
+                "ACC",
+                "BANKBARODA",
+                "TATAPOWER",
+                "TATAMTRDVR"
+            ],
+            "notes": "TATAMTRDVR excluded, returning index to 50 securities",
+            "source": "NSE PDF: ind_prs28082017.pdf"
+        },
+        {
+            "effective_date": "2017-05-26",
+            "additions": [
+                "VEDL"
+            ],
+            "exclusions": [
+                "GRASIM"
+            ],
+            "notes": "Corporate action: Grasim merger with Aditya Birla Nuvo",
+            "source": "sec.gov filing"
+        },
+        {
+            "effective_date": "2017-03-31",
+            "additions": [
+                "IBULHSGFIN",
+                "IOC"
+            ],
+            "exclusions": [
+                "BHEL",
+                "IDEA"
+            ],
+            "source": "NSE PDF: ind_prs16022017.pdf"
+        },
+        {
+            "effective_date": "2016-09-30",
+            "additions": [],
+            "exclusions": [],
+            "notes": "No changes to NIFTY 50",
+            "source": "NSE PDF: ind_prs12082016.pdf"
+        },
+        {
+            "effective_date": "2016-04-01",
+            "additions": [
+                "AUROPHARMA",
+                "INFRATEL",
+                "EICHERMOT",
+                "TATAMTRDVR"
+            ],
+            "exclusions": [
+                "CAIRN",
+                "PNB",
+                "VEDL"
+            ],
+            "notes": "51 securities due to Tata Motors DVR addition (policy change allowing DVR shares)",
+            "source": "NSE PDF: ind_prs22022016_2.pdf"
+        },
+        {
+            "effective_date": "2015-09-28",
+            "additions": [
+                "ADANIPORTS"
+            ],
+            "exclusions": [
+                "NMDC"
+            ],
+            "source": "NSE PDF: ind_prs12082015.pdf"
+        },
+        {
+            "effective_date": "2015-03-27",
+            "additions": [
+                "IDEA",
+                "YESBANK"
+            ],
+            "exclusions": [
+                "DLF",
+                "JINDALSTEL"
+            ],
+            "source": "NSE PDF: ind_prs20022015.pdf"
+        }
+    ]
+}

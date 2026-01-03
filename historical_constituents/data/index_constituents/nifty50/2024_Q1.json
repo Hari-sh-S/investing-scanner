@@ -1,6 +1,6 @@
 {
     "index": "NIFTY50",
-    "effective_date": "2024-01-01",
+    "effective_date": "2024-03-28",
     "quarter": "2024_Q1",
     "symbols": [
         "ADANIENT",
@@ -19,6 +19,7 @@
         "DIVISLAB",
         "DRREDDY",
         "EICHERMOT",
+        "ETERNAL",
         "GRASIM",
         "HCLTECH",
         "HDFCBANK",
@@ -33,6 +34,7 @@
         "JSWSTEEL",
         "KOTAKBANK",
         "LT",
+        "LTIM",
         "M&M",
         "MARUTI",
         "NESTLEIND",
@@ -42,10 +44,8 @@
         "RELIANCE",
         "SBILIFE",
         "SBIN",
-        "SHRIRAMFIN",
         "SUNPHARMA",
         "TATACONSUM",
-        "TATAMOTORS",
         "TATASTEEL",
         "TCS",
         "TECHM",
@@ -54,10 +54,9 @@
         "UPL",
         "WIPRO"
     ],
-    "isins": [],
     "metadata": {
-        "source": "NSE Website - NIFTY 50 Index Constituents",
-        "parsed_at": "2024-12-19",
-        "notes": "Q1 2024 - Current constituents"
+        "source": "Generated from changes data",
+        "generated_at": "2026-01-02T14:17:09.305156",
+        "change_reversed": "Before 2024-03-28 change"
     }
 }
