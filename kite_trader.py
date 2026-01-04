@@ -140,7 +140,10 @@ def calculate_order_quantities(
     max_position_pct: float = 25.0
 ) -> List[Dict]:
     """
-    Calculate order quantities using inverse volatility weighting.
+    Calculate order quantities using the same proportional weights from the backtest.
+    
+    The backtest already applied inverse volatility sizing when determining shares.
+    We use those share values as weights and scale to the new capital.
     
     Returns list of orders with quantities.
     ALL stocks from open_positions will be included.
@@ -148,58 +151,53 @@ def calculate_order_quantities(
     if not open_positions:
         return []
     
-    n_positions = len(open_positions)
+    # Calculate total value from backtest positions (shares * current price)
+    # This gives us the proportional weights from the backtest's inverse vol sizing
+    total_backtest_value = 0
+    position_values = []
     
-    # Get tickers - try both with and without .NS suffix
-    tickers = [pos['Stock'] + '.NS' for pos in open_positions]
+    for pos in open_positions:
+        shares = pos.get('Shares', 1)
+        current_price = pos.get('Current Price', pos.get('Buy Price', 0))
+        value = shares * current_price
+        position_values.append({
+            'stock': pos['Stock'],
+            'shares': shares,
+            'price': current_price,
+            'value': value
+        })
+        total_backtest_value += value
     
-    # Calculate inverse volatility weights
-    weights = calculate_inverse_volatility_weights(tickers, data)
-    
-    # Ensure ALL tickers have a weight (equal weight fallback for missing ones)
-    equal_weight = 1.0 / n_positions
-    missing_tickers = [t for t in tickers if t not in weights]
-    
-    if missing_tickers:
-        # Add missing tickers with average of existing weights or equal weight
-        if weights:
-            avg_weight = sum(weights.values()) / len(weights)
-            for t in missing_tickers:
-                weights[t] = avg_weight
-        else:
-            for t in missing_tickers:
-                weights[t] = equal_weight
-        
-        # Renormalize
-        total = sum(weights.values())
-        if total > 0:
-            weights = {t: w / total for t, w in weights.items()}
+    if total_backtest_value <= 0:
+        logger.warning("Total backtest value is 0, using equal weights")
+        equal_weight = 1.0 / len(open_positions)
+        for pv in position_values:
+            pv['weight'] = equal_weight
+    else:
+        # Calculate weights based on backtest position values
+        for pv in position_values:
+            pv['weight'] = pv['value'] / total_backtest_value
     
     # Apply max position cap
     max_weight = max_position_pct / 100.0
-    for ticker in weights:
-        weights[ticker] = min(weights[ticker], max_weight)
+    for pv in position_values:
+        pv['weight'] = min(pv['weight'], max_weight)
     
     # Normalize after cap
-    total = sum(weights.values())
-    if total > 0:
-        weights = {t: w / total for t, w in weights.items()}
+    total_weight = sum(pv['weight'] for pv in position_values)
+    if total_weight > 0:
+        for pv in position_values:
+            pv['weight'] = pv['weight'] / total_weight
     
     orders = []
     
-    for pos in open_positions:
-        ticker_ns = pos['Stock'] + '.NS'
-        ticker_clean = pos['Stock']
-        
-        # Get weight - should always exist now
-        weight = weights.get(ticker_ns, equal_weight)
+    for pv in position_values:
+        ticker_clean = pv['stock']
+        weight = pv['weight']
         position_capital = capital * weight
-        
-        # Get current price from open_positions data
-        current_price = pos.get('Current Price', pos.get('Buy Price', 0))
+        current_price = pv['price']
         
         if current_price <= 0:
-            # Skip if no valid price
             logger.warning(f"Skipping {ticker_clean}: no valid price")
             continue
         
@@ -217,7 +215,6 @@ def calculate_order_quantities(
                 'estimated_value': round(quantity * current_price, 2)
             })
         else:
-            # Include with 0 quantity if price is too high for allocated capital
             logger.warning(f"Skipping {ticker_clean}: quantity would be 0 (price: {current_price}, allocated: {position_capital})")
     
     return orders
