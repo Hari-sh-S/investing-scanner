@@ -138,70 +138,104 @@ def download_pdf(url: str) -> Optional[bytes]:
 def extract_changes_from_pdf(pdf_content: bytes, press_release: Dict) -> Dict[str, Dict]:
     """
     Parse PDF and extract index constituent changes.
+    NSE PDFs have tables with [Sr. No., Company Name, Symbol] structure.
+    The context (Excluded/Included) comes from text before each table.
     Returns: {index_key: {'additions': [], 'exclusions': [], 'date': str}}
     """
     changes = {}
     
     try:
         with pdfplumber.open(BytesIO(pdf_content)) as pdf:
-            full_text = ""
-            tables = []
-            
+            # Process each page
             for page in pdf.pages:
                 text = page.extract_text() or ""
-                full_text += text + "\n"
+                tables = page.extract_tables() or []
                 
-                # Extract tables
-                page_tables = page.extract_tables()
-                for table in page_tables:
-                    tables.append(table)
-            
-            # Parse the text and tables for each index
-            current_index = None
-            additions = []
-            exclusions = []
-            
-            # Patterns to identify index sections
-            for index_name, index_key in INDEX_NAME_MAP.items():
-                # Look for index name in text followed by additions/exclusions
-                pattern = re.compile(
-                    rf'{re.escape(index_name)}.*?(?:inclusion|addition|include)s?.*?:\s*([\w\s,]+?)(?:exclusion|remove|exclude)s?.*?:\s*([\w\s,]+)',
-                    re.IGNORECASE | re.DOTALL
-                )
+                # Find positions of key markers in text
+                text_lower = text.lower()
                 
-                match = pattern.search(full_text)
-                if match:
-                    add_text = match.group(1)
-                    exc_text = match.group(2)
+                # Track current context (which index, excluded/included)
+                current_index_key = None
+                is_exclusion = False
+                
+                # Process tables on this page
+                for table in tables:
+                    if not table or len(table) < 2:
+                        continue
                     
-                    # Extract stock symbols
-                    add_symbols = extract_symbols(add_text)
-                    exc_symbols = extract_symbols(exc_text)
+                    # Check if this is a stock table [Sr. No., Company Name, Symbol]
+                    headers = [str(cell).lower().strip() if cell else '' for cell in table[0]]
                     
-                    if add_symbols or exc_symbols:
-                        if index_key not in changes:
-                            changes[index_key] = {
-                                'additions': [],
-                                'exclusions': [],
-                                'date': press_release['date'],
-                                'source': press_release['url']
-                            }
-                        changes[index_key]['additions'].extend(add_symbols)
-                        changes[index_key]['exclusions'].extend(exc_symbols)
-            
-            # Also try to parse tables
-            for table in tables:
-                if table and len(table) > 1:
-                    parsed = parse_table_for_changes(table, press_release)
-                    for index_key, data in parsed.items():
-                        if index_key not in changes:
-                            changes[index_key] = data
-                        else:
-                            changes[index_key]['additions'].extend(data.get('additions', []))
-                            changes[index_key]['exclusions'].extend(data.get('exclusions', []))
+                    # Look for Symbol column
+                    symbol_col = None
+                    for i, h in enumerate(headers):
+                        if 'symbol' in h:
+                            symbol_col = i
+                            break
+                    
+                    if symbol_col is None:
+                        continue
+                    
+                    # Extract symbols from table
+                    symbols = []
+                    for row in table[1:]:
+                        if row and len(row) > symbol_col and row[symbol_col]:
+                            symbol = str(row[symbol_col]).strip().upper()
+                            # Validate it looks like a stock symbol
+                            if symbol and len(symbol) >= 2 and len(symbol) <= 20:
+                                if re.match(r'^[A-Z0-9\-&]+$', symbol):
+                                    symbols.append(symbol)
+                    
+                    if not symbols:
+                        continue
+                    
+                    # Try to find context from text above table
+                    # Look for index name and excluded/included keywords
+                    for index_name, index_key in INDEX_NAME_MAP.items():
+                        if index_name.upper() in text.upper() or index_name.replace(' ', '').upper() in text.upper():
+                            # Check if this section is about exclusion or inclusion
+                            # Look for patterns like "Excluded from NIFTY 50" or "following are excluded"
+                            excl_patterns = ['excluded', 'exclusion', 'removed', 'will be removed', 'deletion']
+                            incl_patterns = ['included', 'inclusion', 'added', 'will be added', 'addition']
+                            
+                            # Check which pattern comes first before this index mention
+                            is_exclusion = any(p in text_lower for p in excl_patterns)
+                            is_inclusion = any(p in text_lower for p in incl_patterns)
+                            
+                            # Default: first table after index name is usually exclusions
+                            if index_key not in changes:
+                                changes[index_key] = {
+                                    'additions': [],
+                                    'exclusions': [],
+                                    'date': press_release['date'],
+                                    'source': press_release['url']
+                                }
+                            
+                            # Heuristic: if 'exclud' appears before 'includ' in text, first table is exclusions
+                            excl_pos = text_lower.find('exclud')
+                            incl_pos = text_lower.find('includ')
+                            
+                            if excl_pos >= 0 and (incl_pos < 0 or excl_pos < incl_pos):
+                                # This is likely an exclusion table
+                                changes[index_key]['exclusions'].extend(symbols)
+                            elif incl_pos >= 0:
+                                # This is likely an inclusion table
+                                changes[index_key]['additions'].extend(symbols)
+                            else:
+                                # Can't determine, add to exclusions by default (first tables are usually exclusions)
+                                if not changes[index_key]['exclusions']:
+                                    changes[index_key]['exclusions'].extend(symbols)
+                                else:
+                                    changes[index_key]['additions'].extend(symbols)
+                            break
     
     except Exception as e:
         print(f"Error parsing PDF: {e}")
+    
+    # Remove duplicates
+    for index_key in changes:
+        changes[index_key]['additions'] = list(set(changes[index_key]['additions']))
+        changes[index_key]['exclusions'] = list(set(changes[index_key]['exclusions']))
     
     return changes
 
