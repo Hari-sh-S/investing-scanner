@@ -9,6 +9,7 @@ from scoring import ScoreParser
 from nifty_universe import get_all_universe_names, get_universe, get_broad_market_universes
 from report_generator import create_excel_with_charts, create_pdf_report, prepare_complete_log_data
 from monte_carlo import MonteCarloSimulator, extract_trade_pnls, PortfolioMonteCarloSimulator, extract_monthly_returns
+import kite_trader
 import datetime
 import io
 import time
@@ -921,6 +922,117 @@ with main_tabs[0]:
                                         color_unrealized, subset=['Unrealized ROI %']
                                     )
                                     st.dataframe(styled_open, use_container_width=True)
+                                    
+                                    # === KITE TRADING INTEGRATION ===
+                                    st.markdown("---")
+                                    st.markdown("### 🚀 Execute Trades on Zerodha")
+                                    
+                                    # Check if Kite is configured
+                                    if kite_trader.is_kite_configured():
+                                        # Handle OAuth callback if request_token in URL
+                                        query_params = st.query_params
+                                        if 'request_token' in query_params:
+                                            request_token = query_params['request_token']
+                                            if kite_trader.handle_kite_callback(request_token):
+                                                st.success(f"✅ Logged in as: {st.session_state.get('kite_user_name', 'User')}")
+                                                # Clear the URL params
+                                                st.query_params.clear()
+                                            else:
+                                                st.error("❌ Login failed. Please try again.")
+                                        
+                                        # Check if authenticated
+                                        is_authenticated = st.session_state.get('kite_access_token') is not None
+                                        
+                                        if not is_authenticated:
+                                            # Show login button
+                                            login_url = kite_trader.get_login_url()
+                                            st.warning("⚠️ Not logged in to Zerodha. Click below to authenticate.")
+                                            st.link_button("🔐 Login to Zerodha Kite", login_url, type="primary")
+                                        else:
+                                            st.success(f"✅ Connected to Zerodha as: {st.session_state.get('kite_user_name', 'User')}")
+                                            
+                                            # Capital input and Execute button
+                                            trade_col1, trade_col2 = st.columns([1, 1])
+                                            
+                                            with trade_col1:
+                                                trade_capital = st.number_input(
+                                                    "💰 Capital to Deploy (₹)",
+                                                    min_value=10000,
+                                                    max_value=10000000,
+                                                    value=100000,
+                                                    step=10000,
+                                                    help="Enter the capital to deploy. Orders will be sized using Inverse Volatility."
+                                                )
+                                            
+                                            with trade_col2:
+                                                st.write("")  # Spacing
+                                                st.write("")  # Spacing
+                                                execute_clicked = st.button(
+                                                    "📤 Execute Trades",
+                                                    type="primary",
+                                                    use_container_width=True,
+                                                    help="Place market orders for all open positions"
+                                                )
+                                            
+                                            # Calculate and show order preview
+                                            calculated_orders = kite_trader.calculate_order_quantities(
+                                                open_positions,
+                                                trade_capital,
+                                                engine.data,
+                                                max_position_pct=25.0
+                                            )
+                                            
+                                            if calculated_orders:
+                                                st.markdown("#### 📋 Order Preview (Inverse Volatility Sizing)")
+                                                preview_df = pd.DataFrame(calculated_orders)
+                                                preview_df = preview_df[['tradingsymbol', 'quantity', 'price', 'weight_pct', 'estimated_value']]
+                                                preview_df.columns = ['Stock', 'Qty', 'Price (₹)', 'Weight %', 'Est. Value (₹)']
+                                                st.dataframe(preview_df, use_container_width=True, hide_index=True)
+                                                
+                                                total_value = sum(o['estimated_value'] for o in calculated_orders)
+                                                st.caption(f"**Total Estimated Value:** ₹{total_value:,.2f} | **Unused Capital:** ₹{trade_capital - total_value:,.2f}")
+                                            
+                                            # Execute orders
+                                            if execute_clicked:
+                                                if not calculated_orders:
+                                                    st.error("No valid orders to execute.")
+                                                else:
+                                                    with st.spinner("Placing orders on Zerodha..."):
+                                                        result = kite_trader.execute_orders_on_kite(calculated_orders, dry_run=False)
+                                                    
+                                                    if result['success']:
+                                                        st.success(f"✅ {result['message']}")
+                                                        
+                                                        if result['orders_placed']:
+                                                            st.markdown("**Orders Placed:**")
+                                                            for order in result['orders_placed']:
+                                                                st.write(f"• {order['tradingsymbol']}: {order['quantity']} shares - {order.get('order_id', 'N/A')}")
+                                                    else:
+                                                        st.error(f"❌ {result['message']}")
+                                                    
+                                                    if result['orders_failed']:
+                                                        st.markdown("**Failed Orders:**")
+                                                        for order in result['orders_failed']:
+                                                            st.error(f"• {order['tradingsymbol']}: {order['message']}")
+                                            
+                                            # Logout option
+                                            if st.button("🚪 Logout from Zerodha", key="kite_logout"):
+                                                st.session_state.kite_access_token = None
+                                                st.session_state.kite_user_id = None
+                                                st.session_state.kite_user_name = None
+                                                st.rerun()
+                                    else:
+                                        st.info("""
+                                        **Zerodha Trading not configured.**
+                                        
+                                        To enable live trading, add these to your Streamlit secrets:
+                                        ```
+                                        KITE_API_KEY = "your_api_key"
+                                        KITE_API_SECRET = "your_api_secret"
+                                        ```
+                                        
+                                        Get your API credentials from [Kite Connect](https://kite.trade/).
+                                        """)
                             else:
                                 st.info("No trades executed")
                         
