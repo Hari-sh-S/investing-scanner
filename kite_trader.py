@@ -143,15 +143,37 @@ def calculate_order_quantities(
     Calculate order quantities using inverse volatility weighting.
     
     Returns list of orders with quantities.
+    ALL stocks from open_positions will be included.
     """
     if not open_positions:
         return []
     
-    # Get tickers
+    n_positions = len(open_positions)
+    
+    # Get tickers - try both with and without .NS suffix
     tickers = [pos['Stock'] + '.NS' for pos in open_positions]
     
     # Calculate inverse volatility weights
     weights = calculate_inverse_volatility_weights(tickers, data)
+    
+    # Ensure ALL tickers have a weight (equal weight fallback for missing ones)
+    equal_weight = 1.0 / n_positions
+    missing_tickers = [t for t in tickers if t not in weights]
+    
+    if missing_tickers:
+        # Add missing tickers with average of existing weights or equal weight
+        if weights:
+            avg_weight = sum(weights.values()) / len(weights)
+            for t in missing_tickers:
+                weights[t] = avg_weight
+        else:
+            for t in missing_tickers:
+                weights[t] = equal_weight
+        
+        # Renormalize
+        total = sum(weights.values())
+        if total > 0:
+            weights = {t: w / total for t, w in weights.items()}
     
     # Apply max position cap
     max_weight = max_position_pct / 100.0
@@ -169,13 +191,16 @@ def calculate_order_quantities(
         ticker_ns = pos['Stock'] + '.NS'
         ticker_clean = pos['Stock']
         
-        weight = weights.get(ticker_ns, 1.0 / len(open_positions))
+        # Get weight - should always exist now
+        weight = weights.get(ticker_ns, equal_weight)
         position_capital = capital * weight
         
-        # Get current price
+        # Get current price from open_positions data
         current_price = pos.get('Current Price', pos.get('Buy Price', 0))
         
         if current_price <= 0:
+            # Skip if no valid price
+            logger.warning(f"Skipping {ticker_clean}: no valid price")
             continue
         
         # Calculate quantity (whole shares only)
@@ -191,6 +216,9 @@ def calculate_order_quantities(
                 'allocated_capital': round(position_capital, 2),
                 'estimated_value': round(quantity * current_price, 2)
             })
+        else:
+            # Include with 0 quantity if price is too high for allocated capital
+            logger.warning(f"Skipping {ticker_clean}: quantity would be 0 (price: {current_price}, allocated: {position_capital})")
     
     return orders
 
