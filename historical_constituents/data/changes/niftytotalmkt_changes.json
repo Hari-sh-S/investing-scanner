@@ -26,6 +26,17 @@
             "source": "https://www.niftyindices.com/Press_Release/ind_prs21022025.pdf"
         },
         {
+            "effective_date": "2024-10-04",
+            "additions": [],
+            "exclusions": [
+                "EMCURE",
+                "MCX",
+                "LICI",
+                "IDFC"
+            ],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs04102024.pdf"
+        },
+        {
             "effective_date": "2024-09-25",
             "additions": [],
             "exclusions": [

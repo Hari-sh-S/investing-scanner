@@ -58,6 +58,376 @@
             "source": "https://www.niftyindices.com/Press_Release/ind_prs21022025.pdf"
         },
         {
+            "effective_date": "2024-12-31",
+            "additions": [
+                "CARRARO",
+                "VENTIVE",
+                "SENORES"
+            ],
+            "exclusions": [],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs31122024.pdf"
+        },
+        {
+            "effective_date": "2024-12-30",
+            "additions": [
+                "TRANSRAILL",
+                "MAMATA",
+                "DAMCAPITAL",
+                "CEWATER",
+                "SANATHAN"
+            ],
+            "exclusions": [],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs30122024_1.pdf"
+        },
+        {
+            "effective_date": "2024-12-24",
+            "additions": [],
+            "exclusions": [
+                "CLOUD"
+            ],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs24122024.pdf"
+        },
+        {
+            "effective_date": "2024-12-23",
+            "additions": [
+                "IGIL"
+            ],
+            "exclusions": [],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs23122024.pdf"
+        },
+        {
+            "effective_date": "2024-12-20",
+            "additions": [
+                "IKS"
+            ],
+            "exclusions": [],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs20122024_1.pdf"
+        },
+        {
+            "effective_date": "2024-12-19",
+            "additions": [
+                "MOBIKWIK",
+                "VMM",
+                "SAILIFE"
+            ],
+            "exclusions": [],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs19122024.pdf"
+        },
+        {
+            "effective_date": "2024-12-11",
+            "additions": [
+                "WOL3D",
+                "MPHASIS",
+                "COFORGE",
+                "PAYTM",
+                "BHEL",
+                "SUZLON",
+                "ABB",
+                "ANANDRATHI",
+                "PETRONET",
+                "PAGEIND",
+                "JUBLFOOD",
+                "INDHOTEL",
+                "USHAFIN",
+                "ADANIPORTS",
+                "IREDA",
+                "THERMAX",
+                "SUNLITE",
+                "PERSISTENT",
+                "TUNWAL",
+                "SJVN",
+                "BEL",
+                "SPPPOLY",
+                "FEDERALBNK",
+                "MAXHEALTH",
+                "APARINDS",
+                "UNILEX",
+                "BDL",
+                "TRITURBINE",
+                "HUDCO",
+                "BAJAJ-AUTO",
+                "ADANIPOWER",
+                "CRISIL",
+                "GODREJIND",
+                "COROMANDEL",
+                "BIOCON",
+                "TECHERA",
+                "SCHNEIDER",
+                "VERA",
+                "SYNGENE",
+                "SIEMENS",
+                "VIESL",
+                "TROM",
+                "OIL",
+                "UTSSAV",
+                "VLINFRA",
+                "POWERINDIA",
+                "UHTL",
+                "TORNTPOWER",
+                "THESL",
+                "LLOYDSME",
+                "VDEAL"
+            ],
+            "exclusions": [
+                "NBCC",
+                "MPHASIS",
+                "GLAXO",
+                "KSB",
+                "LINDEINDIA",
+                "TATASTEEL",
+                "UNIONBANK",
+                "PAGEIND",
+                "UTIAMC",
+                "GMDCLTD",
+                "GSFC",
+                "ENGINERSIN",
+                "NH",
+                "BANDHANBNK",
+                "MARUTI",
+                "KEI",
+                "TECHNOE",
+                "INDUSINDBK",
+                "HINDZINC",
+                "JYOTHYLAB",
+                "MMTC",
+                "COALINDIA",
+                "NESTLEIND",
+                "IRCON",
+                "BDL",
+                "INDIANB",
+                "HUDCO",
+                "AXISBANK",
+                "TECHM",
+                "LT",
+                "POLYMED",
+                "BPCL",
+                "INDUSTOWER",
+                "SUVENPHAR",
+                "SCHNEIDER",
+                "JINDALSTEL",
+                "SUMICHEM",
+                "SYNGENE",
+                "CHENNPETRO",
+                "TATAMOTORS",
+                "HEROMOTOCO",
+                "PEL",
+                "REDINGTON",
+                "DRREDDY",
+                "J&KBANK",
+                "RADICO",
+                "MGL",
+                "BSOFT",
+                "BANKINDIA",
+                "GPIL",
+                "NEWGEN"
+            ],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs11122024.pdf"
+        },
+        {
+            "effective_date": "2024-12-09",
+            "additions": [
+                "SURAKSHA"
+            ],
+            "exclusions": [],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs09122024.pdf"
+        },
+        {
+            "effective_date": "2024-12-02",
+            "additions": [
+                "EIEL"
+            ],
+            "exclusions": [],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs02122024.pdf"
+        },
+        {
+            "effective_date": "2024-11-28",
+            "additions": [
+                "NTPCGREEN"
+            ],
+            "exclusions": [],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs28112024_1.pdf"
+        },
+        {
+            "effective_date": "2024-11-28",
+            "additions": [],
+            "exclusions": [
+                "CMMIPL"
+            ],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs28112024_2.pdf"
+        },
+        {
+            "effective_date": "2024-11-25",
+            "additions": [
+                "BLACKBUCK"
+            ],
+            "exclusions": [],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs25112024_1.pdf"
+        },
+        {
+            "effective_date": "2024-11-22",
+            "additions": [
+                "SAIL",
+                "NSLNISP"
+            ],
+            "exclusions": [],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs22112024.pdf"
+        },
+        {
+            "effective_date": "2024-11-18",
+            "additions": [
+                "NIVABUPA"
+            ],
+            "exclusions": [],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs18112024.pdf"
+        },
+        {
+            "effective_date": "2024-11-14",
+            "additions": [
+                "ACMESOLAR",
+                "SWIGGY"
+            ],
+            "exclusions": [],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs14112024.pdf"
+        },
+        {
+            "effective_date": "2024-11-13",
+            "additions": [
+                "SAGILITY"
+            ],
+            "exclusions": [],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs13112024.pdf"
+        },
+        {
+            "effective_date": "2024-11-05",
+            "additions": [
+                "AFCONS"
+            ],
+            "exclusions": [],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs05112024.pdf"
+        },
+        {
+            "effective_date": "2024-11-05",
+            "additions": [],
+            "exclusions": [
+                "INNOVANA"
+            ],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs05112024_1.pdf"
+        },
+        {
+            "effective_date": "2024-10-31",
+            "additions": [
+                "GODAVARIB"
+            ],
+            "exclusions": [],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs31102024.pdf"
+        },
+        {
+            "effective_date": "2024-10-29",
+            "additions": [
+                "DBEIL",
+                "WAAREEENER"
+            ],
+            "exclusions": [],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs29102024.pdf"
+        },
+        {
+            "effective_date": "2024-10-29",
+            "additions": [],
+            "exclusions": [
+                "ABINFRA"
+            ],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs29102024_1.pdf"
+        },
+        {
+            "effective_date": "2024-10-23",
+            "additions": [
+                "HYUNDAI"
+            ],
+            "exclusions": [],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs23102024.pdf"
+        },
+        {
+            "effective_date": "2024-10-16",
+            "additions": [
+                "GARUDA"
+            ],
+            "exclusions": [],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs16102024.pdf"
+        },
+        {
+            "effective_date": "2024-10-10",
+            "additions": [],
+            "exclusions": [
+                "AKUMS",
+                "TV18BRDCST"
+            ],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs10102024.pdf"
+        },
+        {
+            "effective_date": "2024-10-10",
+            "additions": [
+                "TBOTEK",
+                "RVNL"
+            ],
+            "exclusions": [
+                "ERIS",
+                "TATAELXSI",
+                "CAPLIPOINT",
+                "SAIL",
+                "NH",
+                "ABFRL",
+                "AKUMS",
+                "HBLPOWER",
+                "RCF",
+                "IRCTC",
+                "GNFC",
+                "JYOTICNC",
+                "KNRCON",
+                "MMTC",
+                "AFFLE",
+                "INDIACEM",
+                "BEML",
+                "MAXHEALTH"
+            ],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs10102024_1.pdf"
+        },
+        {
+            "effective_date": "2024-10-07",
+            "additions": [
+                "DIFFNKG"
+            ],
+            "exclusions": [],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs07102024.pdf"
+        },
+        {
+            "effective_date": "2024-10-04",
+            "additions": [],
+            "exclusions": [
+                "EMCURE",
+                "ZEEL",
+                "KARURVYSYA",
+                "HINDZINC",
+                "IDFC"
+            ],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs04102024.pdf"
+        },
+        {
+            "effective_date": "2024-10-04",
+            "additions": [
+                "KRN"
+            ],
+            "exclusions": [],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs04102024_1.pdf"
+        },
+        {
+            "effective_date": "2024-10-01",
+            "additions": [
+                "MANBA"
+            ],
+            "exclusions": [],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs01102024.pdf"
+        },
+        {
             "effective_date": "2024-09-30",
             "additions": [
                 "TRENT",
@@ -79,6 +449,103 @@
             "source": "https://www.niftyindices.com/Press_Release/ind_prs25092024.pdf"
         },
         {
+            "effective_date": "2024-09-23",
+            "additions": [],
+            "exclusions": [
+                "AETHER",
+                "CLEAN",
+                "ENGINERSIN",
+                "EPL",
+                "FDC",
+                "GMMPFAUDLR",
+                "INDIGOPNTS",
+                "LTIM",
+                "GLS",
+                "HAPPYFORGE",
+                "BPCL",
+                "ANURAS",
+                "TRENT",
+                "ALLCARGO",
+                "BEL",
+                "CUMMINSIND"
+            ],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs23092024.pdf"
+        },
+        {
+            "effective_date": "2024-09-18",
+            "additions": [
+                "PNGJL"
+            ],
+            "exclusions": [],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs18092024.pdf"
+        },
+        {
+            "effective_date": "2024-09-17",
+            "additions": [
+                "BAJAJHFL",
+                "KROSS",
+                "TOLINS"
+            ],
+            "exclusions": [],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs17092024.pdf"
+        },
+        {
+            "effective_date": "2024-09-13",
+            "additions": [
+                "BALAJEE"
+            ],
+            "exclusions": [],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs13092024_1.pdf"
+        },
+        {
+            "effective_date": "2024-09-10",
+            "additions": [
+                "GALAPREC"
+            ],
+            "exclusions": [],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs10092024.pdf"
+        },
+        {
+            "effective_date": "2024-09-09",
+            "additions": [
+                "STYLEBAAZA"
+            ],
+            "exclusions": [],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs09092024_1.pdf"
+        },
+        {
+            "effective_date": "2024-09-05",
+            "additions": [
+                "ECOSMOBLTY"
+            ],
+            "exclusions": [],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs05092024.pdf"
+        },
+        {
+            "effective_date": "2024-09-04",
+            "additions": [
+                "PREMIERENE"
+            ],
+            "exclusions": [],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs04092024_1.pdf"
+        },
+        {
+            "effective_date": "2024-08-29",
+            "additions": [
+                "ORIENTTECH"
+            ],
+            "exclusions": [],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs29082024.pdf"
+        },
+        {
+            "effective_date": "2024-08-27",
+            "additions": [
+                "INTERARCH"
+            ],
+            "exclusions": [],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs27082024_1.pdf"
+        },
+        {
             "effective_date": "2024-08-23",
             "additions": [],
             "exclusions": [
@@ -86,6 +553,199 @@
                 "SR"
             ],
             "source": "https://www.niftyindices.com/Press_Release/ind_prs23082024.pdf"
+        },
+        {
+            "effective_date": "2024-08-21",
+            "additions": [
+                "SSDL"
+            ],
+            "exclusions": [],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs21082024.pdf"
+        },
+        {
+            "effective_date": "2024-08-14",
+            "additions": [
+                "FIRSTCRY",
+                "UNIECOM"
+            ],
+            "exclusions": [],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs14082024.pdf"
+        },
+        {
+            "effective_date": "2024-08-12",
+            "additions": [
+                "OLAELEC"
+            ],
+            "exclusions": [],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs12082024.pdf"
+        },
+        {
+            "effective_date": "2024-08-09",
+            "additions": [
+                "CEIGALL"
+            ],
+            "exclusions": [],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs09082024.pdf"
+        },
+        {
+            "effective_date": "2024-08-07",
+            "additions": [
+                "AKUMS"
+            ],
+            "exclusions": [],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs07082024.pdf"
+        },
+        {
+            "effective_date": "2024-07-26",
+            "additions": [
+                "SANSTAR"
+            ],
+            "exclusions": [],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs26072024.pdf"
+        },
+        {
+            "effective_date": "2024-07-24",
+            "additions": [],
+            "exclusions": [
+                "DALBHARAT",
+                "GODREJCP",
+                "WIPRO",
+                "AMBUJACEM",
+                "CERA",
+                "INFY",
+                "LALPATHLAB",
+                "PERSISTENT"
+            ],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs24072024.pdf"
+        },
+        {
+            "effective_date": "2024-06-27",
+            "additions": [],
+            "exclusions": [
+                "BRIGHT"
+            ],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs27062024.pdf"
+        },
+        {
+            "effective_date": "2024-06-21",
+            "additions": [],
+            "exclusions": [
+                "ABB"
+            ],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs21062024_1.pdf"
+        },
+        {
+            "effective_date": "2024-06-07",
+            "additions": [
+                "TGL",
+                "SIGNORIA",
+                "VISHWAS",
+                "SLONE",
+                "WINSOL",
+                "SILKFLEX",
+                "TRUST",
+                "TCL",
+                "VR",
+                "SONAMAC",
+                "TAC",
+                "ZENITHDRUG",
+                "YASHOPTICS",
+                "WTICAB"
+            ],
+            "exclusions": [
+                "SAIL",
+                "GLAXO",
+                "RAJESHEXPO",
+                "KALYANKJIL",
+                "MAPMYINDIA",
+                "CDSL",
+                "AUROPHARMA",
+                "TITAGARH",
+                "HONAUT",
+                "DEEPAKFERT",
+                "ITI",
+                "GMDCLTD",
+                "FACT",
+                "KEI",
+                "VOLTAS",
+                "NHPC",
+                "THERMAX",
+                "HINDZINC",
+                "SJVN",
+                "GRSE",
+                "GMRINFRA",
+                "SAREGAMA",
+                "IRCON",
+                "DIXON",
+                "ANGELONE",
+                "HUDCO",
+                "ELECON",
+                "ECLERX",
+                "RVNL",
+                "NATCOPHARM",
+                "CUB",
+                "INDUSTOWER",
+                "CYIENT",
+                "JWL",
+                "NATIONALUM",
+                "CHENNPETRO",
+                "UJJIVANSFB",
+                "OIL",
+                "OFSS",
+                "MEDANTA",
+                "JINDALSAW",
+                "HBLPOWER",
+                "JSL",
+                "JSWENERGY",
+                "J&KBANK",
+                "ENDURANCE",
+                "IRFC",
+                "BSOFT",
+                "GODREJPROP",
+                "TATACHEM",
+                "GICRE",
+                "HINDPETRO"
+            ],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs07062024.pdf"
+        },
+        {
+            "effective_date": "2024-05-22",
+            "additions": [],
+            "exclusions": [
+                "COFORGE",
+                "DIVISLAB",
+                "ZYDUSLIFE",
+                "TATASTEEL",
+                "PRAJIND",
+                "GRASIM",
+                "UPL",
+                "ABBOTINDIA",
+                "ZENSARTECH",
+                "CONCOR",
+                "LUPIN",
+                "MMTC",
+                "SUNPHARMA",
+                "BIRLACORPN",
+                "CAMS",
+                "PRSMJOHNSN",
+                "BIOCON",
+                "TIINDIA",
+                "ADANIENT",
+                "ROUTE",
+                "TRENT",
+                "AIAENG",
+                "SRF"
+            ],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs22052024.pdf"
+        },
+        {
+            "effective_date": "2024-04-24",
+            "additions": [],
+            "exclusions": [
+                "IIFL",
+                "BCG"
+            ],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs24042024.pdf"
         },
         {
             "effective_date": "2024-03-28",
@@ -98,6 +758,73 @@
             "source": "niftyindices.com, investing.com"
         },
         {
+            "effective_date": "2024-03-19",
+            "additions": [
+                "VGUARD",
+                "TATATECH",
+                "MAHSEAMLES",
+                "RAILTEL",
+                "JAIBALAJI",
+                "TITAGARH",
+                "LLOYDSME",
+                "JWL",
+                "HONASA",
+                "IREDA",
+                "BSE"
+            ],
+            "exclusions": [
+                "DOMS",
+                "HSCL",
+                "ROSSARI",
+                "SUPRAJIT",
+                "UPL",
+                "INGERRAND",
+                "RALLIS",
+                "TTKPRESTIG",
+                "POLYPLEX",
+                "ASTRAZEN",
+                "ACE",
+                "VINATIORGA",
+                "JYOTICNC",
+                "GRINFRA",
+                "RELAXO",
+                "ORIENTELEC",
+                "GALAXYSURF",
+                "BSE",
+                "VGUARD",
+                "SHARDACROP",
+                "ELECON",
+                "LUXIND",
+                "JAMNAAUTO",
+                "BLUESTARCO",
+                "VIPIND",
+                "INFIBEAM",
+                "CHENNPETRO",
+                "AARTIDRUGS",
+                "HBLPOWER",
+                "TEAMLEASE",
+                "HAPPYFORGE",
+                "PGHL",
+                "GUJALKALI",
+                "LAXMIMACH",
+                "IREDA"
+            ],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs19032024.pdf"
+        },
+        {
+            "effective_date": "2024-03-14",
+            "additions": [
+                "SHRIRAMFIN",
+                "OFSS",
+                "TORNTPHARM",
+                "GMRINFRA",
+                "HINDPETRO",
+                "IOC"
+            ],
+            "exclusions": [],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs14032024.pdf"
+        },
+        {
             "effective_date": "2024-02-28",
             "additions": [],
             "exclusions": [
@@ -105,6 +832,31 @@
                 "SR"
             ],
             "source": "https://www.niftyindices.com/Press_Release/ind_prs28022024.pdf"
+        },
+        {
+            "effective_date": "2024-01-30",
+            "additions": [],
+            "exclusions": [
+                "TATAMETALI"
+            ],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs30012024.pdf"
+        },
+        {
+            "effective_date": "2024-01-19",
+            "additions": [
+                "JUBLPHARMA",
+                "RCF"
+            ],
+            "exclusions": [],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs19012024.pdf"
+        },
+        {
+            "effective_date": "2024-01-10",
+            "additions": [],
+            "exclusions": [
+                "TINPLATE"
+            ],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs10012024.pdf"
         },
         {
             "effective_date": "2023-09-29",

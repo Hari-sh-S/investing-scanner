@@ -26,6 +26,16 @@
             "source": "https://www.niftyindices.com/Press_Release/ind_prs21022025.pdf"
         },
         {
+            "effective_date": "2024-10-10",
+            "additions": [],
+            "exclusions": [
+                "AKUMS",
+                "DEN",
+                "TV18BRDCST"
+            ],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs10102024.pdf"
+        },
+        {
             "effective_date": "2024-08-23",
             "additions": [],
             "exclusions": [

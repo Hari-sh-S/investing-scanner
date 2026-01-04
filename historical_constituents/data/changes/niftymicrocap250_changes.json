@@ -18,6 +18,34 @@
             "source": "https://www.niftyindices.com/Press_Release/ind_prs21022025.pdf"
         },
         {
+            "effective_date": "2024-09-23",
+            "additions": [
+                "HEROMOTOCO",
+                "VOLTAS",
+                "TORNTPHARM",
+                "IDEA",
+                "COLPAL",
+                "DCMSHRIRAM",
+                "JNKINDIA",
+                "PERSISTENT",
+                "EXICOM",
+                "BHARTIARTL",
+                "LAXMIMACH",
+                "INDIGO"
+            ],
+            "exclusions": [],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs23092024.pdf"
+        },
+        {
+            "effective_date": "2024-08-27",
+            "additions": [],
+            "exclusions": [
+                "KSL",
+                "TCNSBRANDS"
+            ],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs27082024.pdf"
+        },
+        {
             "effective_date": "2024-08-23",
             "additions": [],
             "exclusions": [
@@ -26,12 +54,48 @@
             "source": "https://www.niftyindices.com/Press_Release/ind_prs23082024.pdf"
         },
         {
+            "effective_date": "2024-04-24",
+            "additions": [],
+            "exclusions": [
+                "SPLPETRO",
+                "BCG"
+            ],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs24042024.pdf"
+        },
+        {
+            "effective_date": "2024-04-24",
+            "additions": [],
+            "exclusions": [
+                "JUNIPER",
+                "UJJIVAN"
+            ],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs24042024_1.pdf"
+        },
+        {
             "effective_date": "2024-02-28",
             "additions": [],
             "exclusions": [
                 "SR"
             ],
             "source": "https://www.niftyindices.com/Press_Release/ind_prs28022024.pdf"
+        },
+        {
+            "effective_date": "2024-01-30",
+            "additions": [],
+            "exclusions": [
+                "TATAMETALI",
+                "BASF"
+            ],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs30012024.pdf"
+        },
+        {
+            "effective_date": "2024-01-10",
+            "additions": [],
+            "exclusions": [
+                "TINPLATE",
+                "TVSHLTD"
+            ],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs10012024.pdf"
         },
         {
             "effective_date": "2023-08-17",
