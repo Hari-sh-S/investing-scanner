@@ -1,0 +1,38 @@
+{
+    "index": "NIFTY500LMSEQL",
+    "changes": [
+        {
+            "effective_date": "2025-12-11",
+            "additions": [],
+            "exclusions": [
+                "SR"
+            ],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs11122025.pdf"
+        },
+        {
+            "effective_date": "2025-08-22",
+            "additions": [],
+            "exclusions": [
+                "SR"
+            ],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs22082025.pdf"
+        },
+        {
+            "effective_date": "2025-02-21",
+            "additions": [],
+            "exclusions": [
+                "SR"
+            ],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs21022025.pdf"
+        },
+        {
+            "effective_date": "2024-08-23",
+            "additions": [],
+            "exclusions": [
+                "SR"
+            ],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs23082024.pdf"
+        }
+    ],
+    "last_updated": "2026-01-04"
+}

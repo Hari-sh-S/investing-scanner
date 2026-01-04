@@ -3,8 +3,17 @@
     "source": "Official NSE Press Releases (nsearchives.nseindia.com), news sources",
     "methodology": "Semi-annual review with Jan 31 and July 31 cutoffs. Changes effective last working day of March and September. Special changes may occur mid-period for mergers, delistings, etc.",
     "notes": "Data verified from official NSE press release PDFs for 2015-2017. April 2016-Sept 2017: Index had 51 securities due to Tata Motors DVR addition. ETERNAL is Zomato rebranded in Feb 2025.",
-    "last_updated": "2026-01-02",
+    "last_updated": "2026-01-04",
     "changes": [
+        {
+            "effective_date": "2025-12-11",
+            "additions": [],
+            "exclusions": [
+                "SR",
+                "SR"
+            ],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs11122025.pdf"
+        },
         {
             "effective_date": "2025-09-30",
             "additions": [
@@ -16,6 +25,15 @@
                 "INDUSINDBK"
             ],
             "source": "economictimes.com, tradebrains.in"
+        },
+        {
+            "effective_date": "2025-08-22",
+            "additions": [],
+            "exclusions": [
+                "SR",
+                "SR"
+            ],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs22082025.pdf"
         },
         {
             "effective_date": "2025-03-28",
@@ -31,6 +49,15 @@
             "source": "niftyindices.com, tradingqna.com"
         },
         {
+            "effective_date": "2025-02-21",
+            "additions": [],
+            "exclusions": [
+                "SR",
+                "SR"
+            ],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs21022025.pdf"
+        },
+        {
             "effective_date": "2024-09-30",
             "additions": [
                 "TRENT",
@@ -43,6 +70,24 @@
             "source": "niftyindices.com, icicidirect.com"
         },
         {
+            "effective_date": "2024-09-25",
+            "additions": [],
+            "exclusions": [
+                "SR",
+                "SR"
+            ],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs25092024.pdf"
+        },
+        {
+            "effective_date": "2024-08-23",
+            "additions": [],
+            "exclusions": [
+                "SR",
+                "SR"
+            ],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs23082024.pdf"
+        },
+        {
             "effective_date": "2024-03-28",
             "additions": [
                 "SHRIRAMFIN"
@@ -53,11 +98,29 @@
             "source": "niftyindices.com, investing.com"
         },
         {
+            "effective_date": "2024-02-28",
+            "additions": [],
+            "exclusions": [
+                "SR",
+                "SR"
+            ],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs28022024.pdf"
+        },
+        {
             "effective_date": "2023-09-29",
             "additions": [],
             "exclusions": [],
             "notes": "No changes announced",
             "source": "angelone.in"
+        },
+        {
+            "effective_date": "2023-08-17",
+            "additions": [],
+            "exclusions": [
+                "SR",
+                "SR"
+            ],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs17082023.pdf"
         },
         {
             "effective_date": "2023-07-13",
@@ -78,6 +141,24 @@
             "source": "Verified"
         },
         {
+            "effective_date": "2023-02-17",
+            "additions": [],
+            "exclusions": [
+                "SR",
+                "SR"
+            ],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs17022023_1.pdf"
+        },
+        {
+            "effective_date": "2022-12-06",
+            "additions": [],
+            "exclusions": [
+                "SR",
+                "SR"
+            ],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs06122022.pdf"
+        },
+        {
             "effective_date": "2022-09-30",
             "additions": [
                 "ADANIENT"
@@ -86,6 +167,15 @@
                 "SHREECEM"
             ],
             "source": "livemint.com, tradingqna.com"
+        },
+        {
+            "effective_date": "2022-09-01",
+            "additions": [],
+            "exclusions": [
+                "SR",
+                "SR"
+            ],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs01092022.pdf"
         },
         {
             "effective_date": "2022-03-31",
@@ -137,6 +227,15 @@
             ],
             "notes": "HDFC Life replaced Vedanta",
             "source": "moneyworks4me.com, business-standard.com"
+        },
+        {
+            "effective_date": "2020-07-02",
+            "additions": [],
+            "exclusions": [
+                "SR",
+                "SR"
+            ],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs02072020_1.pdf"
         },
         {
             "effective_date": "2020-03-19",

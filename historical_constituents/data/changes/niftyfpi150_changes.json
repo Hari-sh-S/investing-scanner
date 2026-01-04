@@ -1,0 +1,22 @@
+{
+    "index": "NIFTYFPI150",
+    "changes": [
+        {
+            "effective_date": "2025-12-11",
+            "additions": [],
+            "exclusions": [
+                "SR"
+            ],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs11122025.pdf"
+        },
+        {
+            "effective_date": "2025-08-22",
+            "additions": [],
+            "exclusions": [
+                "SR"
+            ],
+            "source": "https://www.niftyindices.com/Press_Release/ind_prs22082025.pdf"
+        }
+    ],
+    "last_updated": "2026-01-04"
+}
