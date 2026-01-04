@@ -199,23 +199,33 @@ def calculate_order_quantities(
         
         if current_price <= 0:
             logger.warning(f"Skipping {ticker_clean}: no valid price")
+            # Still include in orders with 0 quantity so count matches
+            orders.append({
+                'tradingsymbol': ticker_clean,
+                'exchange': 'NSE',
+                'quantity': 0,
+                'price': 0,
+                'weight_pct': round(weight * 100, 2),
+                'allocated_capital': round(position_capital, 2),
+                'estimated_value': 0,
+                'note': 'No price data'
+            })
             continue
         
         # Calculate quantity (whole shares only)
         quantity = int(position_capital / current_price)
         
-        if quantity > 0:
-            orders.append({
-                'tradingsymbol': ticker_clean,
-                'exchange': 'NSE',
-                'quantity': quantity,
-                'price': current_price,
-                'weight_pct': round(weight * 100, 2),
-                'allocated_capital': round(position_capital, 2),
-                'estimated_value': round(quantity * current_price, 2)
-            })
-        else:
-            logger.warning(f"Skipping {ticker_clean}: quantity would be 0 (price: {current_price}, allocated: {position_capital})")
+        # Include ALL stocks, even with 0 quantity
+        orders.append({
+            'tradingsymbol': ticker_clean,
+            'exchange': 'NSE',
+            'quantity': quantity,
+            'price': current_price,
+            'weight_pct': round(weight * 100, 2),
+            'allocated_capital': round(position_capital, 2),
+            'estimated_value': round(quantity * current_price, 2),
+            'note': '' if quantity > 0 else f'Need ₹{current_price:,.0f}+ (allocated ₹{position_capital:,.0f})'
+        })
     
     return orders
 

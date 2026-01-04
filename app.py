@@ -1979,9 +1979,23 @@ with main_tabs[2]:
                 if calculated_orders:
                     st.markdown("#### 📋 Order Preview (Inverse Volatility Sizing)")
                     preview_df = pd.DataFrame(calculated_orders)
-                    preview_df = preview_df[['tradingsymbol', 'quantity', 'price', 'weight_pct', 'estimated_value']]
-                    preview_df.columns = ['Stock', 'Qty', 'Price (₹)', 'Weight %', 'Est. Value (₹)']
+                    
+                    # Check for stocks with 0 quantity
+                    zero_qty_orders = [o for o in calculated_orders if o['quantity'] == 0]
+                    
+                    # Select columns to show
+                    if 'note' in preview_df.columns:
+                        preview_df = preview_df[['tradingsymbol', 'quantity', 'price', 'weight_pct', 'estimated_value', 'note']]
+                        preview_df.columns = ['Stock', 'Qty', 'Price (₹)', 'Weight %', 'Est. Value (₹)', 'Note']
+                    else:
+                        preview_df = preview_df[['tradingsymbol', 'quantity', 'price', 'weight_pct', 'estimated_value']]
+                        preview_df.columns = ['Stock', 'Qty', 'Price (₹)', 'Weight %', 'Est. Value (₹)']
+                    
                     st.dataframe(preview_df, use_container_width=True, hide_index=True)
+                    
+                    # Warning for stocks with 0 quantity
+                    if zero_qty_orders:
+                        st.warning(f"⚠️ {len(zero_qty_orders)} stock(s) have 0 quantity (price too high for allocated capital). Increase capital to buy these.")
                     
                     total_value = sum(o['estimated_value'] for o in calculated_orders)
                     st.caption(f"**Total Estimated Value:** ₹{total_value:,.2f} | **Unused Capital:** ₹{trade_capital - total_value:,.2f}")
