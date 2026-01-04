@@ -1,7 +1,8 @@
 {
     "index": "NIFTY50",
-    "effective_date": "2018-04-02",
     "quarter": "2018_Q2",
+    "count": 50,
+    "expected_count": 50,
     "symbols": [
         "ADANIPORTS",
         "ASIANPAINT",
@@ -46,6 +47,7 @@
         "TATASTEEL",
         "TCS",
         "TECHM",
+        "TMPV",
         "ULTRACEMCO",
         "UPL",
         "VEDL",
@@ -53,9 +55,5 @@
         "YESBANK",
         "ZEEL"
     ],
-    "metadata": {
-        "source": "Generated from changes data",
-        "generated_at": "2026-01-02T14:17:09.306247",
-        "change_reversed": "Before 2018-04-02 change"
-    }
+    "generated_at": "2026-01-04T18:02:14.459947"
 }

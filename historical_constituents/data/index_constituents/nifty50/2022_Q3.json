@@ -1,7 +1,8 @@
 {
     "index": "NIFTY50",
-    "effective_date": "2022-09-30",
     "quarter": "2022_Q3",
+    "count": 51,
+    "expected_count": 50,
     "symbols": [
         "ADANIPORTS",
         "APOLLOHOSP",
@@ -50,13 +51,10 @@
         "TCS",
         "TECHM",
         "TITAN",
+        "TMPV",
         "ULTRACEMCO",
         "UPL",
         "WIPRO"
     ],
-    "metadata": {
-        "source": "Generated from changes data",
-        "generated_at": "2026-01-02T14:17:09.305156",
-        "change_reversed": "Before 2022-09-30 change"
-    }
+    "generated_at": "2026-01-04T18:02:14.448770"
 }

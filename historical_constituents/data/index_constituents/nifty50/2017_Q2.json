@@ -1,7 +1,8 @@
 {
     "index": "NIFTY50",
-    "effective_date": "2017-05-26",
     "quarter": "2017_Q2",
+    "count": 51,
+    "expected_count": 50,
     "symbols": [
         "ACC",
         "ADANIPORTS",
@@ -49,14 +50,11 @@
         "TATASTEEL",
         "TCS",
         "TECHM",
+        "TMPV",
         "ULTRACEMCO",
         "WIPRO",
         "YESBANK",
         "ZEEL"
     ],
-    "metadata": {
-        "source": "Generated from changes data",
-        "generated_at": "2026-01-02T14:17:09.306247",
-        "change_reversed": "Before 2017-05-26 change"
-    }
+    "generated_at": "2026-01-04T18:02:14.462831"
 }

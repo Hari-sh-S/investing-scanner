@@ -1,7 +1,8 @@
 {
     "index": "NIFTY50",
-    "effective_date": "2025-09-30",
     "quarter": "2025_Q3",
+    "count": 50,
+    "expected_count": 50,
     "symbols": [
         "ADANIENT",
         "ADANIPORTS",
@@ -49,14 +50,10 @@
         "TCS",
         "TECHM",
         "TITAN",
+        "TMPV",
         "TRENT",
         "ULTRACEMCO",
-        "WIPRO",
-        "ZOMATO"
+        "WIPRO"
     ],
-    "metadata": {
-        "source": "Generated from changes data",
-        "generated_at": "2026-01-02T14:17:09.305156",
-        "change_reversed": "Before 2025-09-30 change"
-    }
+    "generated_at": "2026-01-04T18:02:14.443637"
 }

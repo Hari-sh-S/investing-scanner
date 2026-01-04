@@ -1,7 +1,8 @@
 {
     "index": "NIFTY50",
-    "effective_date": "2015-03-27",
     "quarter": "2015_Q1",
+    "count": 50,
+    "expected_count": 50,
     "symbols": [
         "ACC",
         "ASIANPAINT",
@@ -48,14 +49,11 @@
         "TATASTEEL",
         "TCS",
         "TECHM",
+        "TMPV",
         "ULTRACEMCO",
         "VEDL",
         "WIPRO",
         "ZEEL"
     ],
-    "metadata": {
-        "source": "Generated from changes data",
-        "generated_at": "2026-01-02T14:17:09.306247",
-        "change_reversed": "Before 2015-03-27 change"
-    }
+    "generated_at": "2026-01-04T18:02:14.468737"
 }

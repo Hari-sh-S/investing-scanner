@@ -1,7 +1,8 @@
 {
     "index": "NIFTY50",
-    "effective_date": "2026-01-02",
     "quarter": "2026_Q1",
+    "count": 50,
+    "expected_count": 50,
     "symbols": [
         "ADANIENT",
         "ADANIPORTS",
@@ -49,14 +50,10 @@
         "TCS",
         "TECHM",
         "TITAN",
+        "TMPV",
         "TRENT",
         "ULTRACEMCO",
-        "WIPRO",
-        "ZOMATO"
+        "WIPRO"
     ],
-    "metadata": {
-        "source": "nseindia.com - verified current list",
-        "generated_at": "2026-01-02T14:17:09.299984",
-        "notes": "Current constituents as of January 2026"
-    }
+    "generated_at": "2026-01-04T18:02:14.437548"
 }

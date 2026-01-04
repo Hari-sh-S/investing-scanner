@@ -1,0 +1,32 @@
+{
+    "index": "NIFTY MIDCAP SELECT",
+    "fetched_at": "2026-01-04T18:02:22.646370",
+    "count": 25,
+    "symbols": [
+        "ASHOKLEY",
+        "AUROPHARMA",
+        "BHARATFORG",
+        "BHEL",
+        "BSE",
+        "COFORGE",
+        "CUMMINSIND",
+        "DIXON",
+        "GODREJPROP",
+        "HDFCAMC",
+        "HEROMOTOCO",
+        "HINDPETRO",
+        "INDUSINDBK",
+        "INDUSTOWER",
+        "LUPIN",
+        "MANKIND",
+        "MARICO",
+        "MUTHOOTFIN",
+        "PERSISTENT",
+        "POLICYBZR",
+        "POLYCAB",
+        "SRF",
+        "SUZLON",
+        "UNIONBANK",
+        "YESBANK"
+    ]
+}
