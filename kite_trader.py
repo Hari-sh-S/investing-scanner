@@ -190,7 +190,9 @@ def calculate_order_quantities(
             pv['weight'] = pv['weight'] / total_weight
     
     orders = []
+    total_used = 0
     
+    # First pass: calculate initial quantities
     for pv in position_values:
         ticker_clean = pv['stock']
         weight = pv['weight']
@@ -199,7 +201,6 @@ def calculate_order_quantities(
         
         if current_price <= 0:
             logger.warning(f"Skipping {ticker_clean}: no valid price")
-            # Still include in orders with 0 quantity so count matches
             orders.append({
                 'tradingsymbol': ticker_clean,
                 'exchange': 'NSE',
@@ -214,8 +215,9 @@ def calculate_order_quantities(
         
         # Calculate quantity (whole shares only)
         quantity = int(position_capital / current_price)
+        used = quantity * current_price
+        total_used += used
         
-        # Include ALL stocks, even with 0 quantity
         orders.append({
             'tradingsymbol': ticker_clean,
             'exchange': 'NSE',
@@ -223,9 +225,36 @@ def calculate_order_quantities(
             'price': current_price,
             'weight_pct': round(weight * 100, 2),
             'allocated_capital': round(position_capital, 2),
-            'estimated_value': round(quantity * current_price, 2),
-            'note': '' if quantity > 0 else f'Need ₹{current_price:,.0f}+ (allocated ₹{position_capital:,.0f})'
+            'estimated_value': round(used, 2),
+            'note': '' if quantity > 0 else f'Need ₹{current_price:,.0f}+'
         })
+    
+    # Second pass: use remaining capital to buy stocks with 0 quantity
+    remaining_capital = capital - total_used
+    
+    # Sort zero-quantity orders by price (ascending) to prioritize cheaper stocks first
+    zero_qty_indices = [i for i, o in enumerate(orders) if o['quantity'] == 0 and o['price'] > 0]
+    zero_qty_indices.sort(key=lambda i: orders[i]['price'])
+    
+    for idx in zero_qty_indices:
+        order = orders[idx]
+        price = order['price']
+        
+        # How many can we buy with remaining capital?
+        can_buy = int(remaining_capital / price)
+        
+        if can_buy > 0:
+            order['quantity'] = can_buy
+            cost = can_buy * price
+            order['estimated_value'] = round(cost, 2)
+            order['note'] = f'+{can_buy} from unused capital'
+            remaining_capital -= cost
+            total_used += cost
+    
+    # Update notes for any still-zero stocks
+    for order in orders:
+        if order['quantity'] == 0 and order['price'] > 0:
+            order['note'] = f'Need ₹{order["price"]:,.0f}+ (only ₹{remaining_capital:,.0f} unused)'
     
     return orders
 
