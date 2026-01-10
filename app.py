@@ -330,12 +330,21 @@ with main_tabs[0]:
         
         # ===== REGIME FILTER (in expander) =====
         with st.expander("🛡️ Regime Filter", expanded=False):
-            use_regime_filter = st.checkbox("Enable Regime Filter", value=False)
+            # Get saved regime config if present
+            saved_regime = loaded_config.get('regime_config', {}) or {}
+            
+            use_regime_filter = st.checkbox("Enable Regime Filter", 
+                                           value=loaded_config.get('use_regime_filter', False))
             
             regime_config = None
             if use_regime_filter:
+                regime_type_options = ["EMA", "MACD", "SUPERTREND", "EQUITY", "EQUITY_MA"]
+                saved_regime_type = saved_regime.get('type', 'EMA')
+                regime_type_idx = regime_type_options.index(saved_regime_type) if saved_regime_type in regime_type_options else 0
+                
                 regime_type = st.selectbox("Regime Filter Type", 
-                                          ["EMA", "MACD", "SUPERTREND", "EQUITY", "EQUITY_MA"],
+                                          regime_type_options,
+                                          index=regime_type_idx,
                                           help="EQUITY_MA: Uses moving average of your equity curve")
                 
                 # Initialize defaults
@@ -343,38 +352,57 @@ with main_tabs[0]:
                 ma_period = None
                 
                 if regime_type == "EMA":
-                    ema_period = st.selectbox("EMA Period", [34, 68, 100, 150, 200])
+                    ema_options = [34, 68, 100, 150, 200]
+                    saved_ema = saved_regime.get('value', 68) if saved_regime.get('type') == 'EMA' else 68
+                    ema_idx = ema_options.index(saved_ema) if saved_ema in ema_options else 1
+                    ema_period = st.selectbox("EMA Period", ema_options, index=ema_idx)
                     regime_value = ema_period
                 elif regime_type == "MACD":
-                    macd_preset = st.selectbox("MACD Settings", 
-                                              ["35-70-12", "50-100-15", "75-150-12"])
+                    macd_options = ["35-70-12", "50-100-15", "75-150-12"]
+                    saved_macd = saved_regime.get('value', '35-70-12') if saved_regime.get('type') == 'MACD' else '35-70-12'
+                    macd_idx = macd_options.index(saved_macd) if saved_macd in macd_options else 0
+                    macd_preset = st.selectbox("MACD Settings", macd_options, index=macd_idx)
                     regime_value = macd_preset
                 elif regime_type == "SUPERTREND":
-                    st_preset = st.selectbox("SuperTrend (Period-Multiplier)", 
-                                            ["1-1", "1-2", "1-2.5"])
+                    st_options = ["1-1", "1-2", "1-2.5"]
+                    saved_st = saved_regime.get('value', '1-2') if saved_regime.get('type') == 'SUPERTREND' else '1-2'
+                    st_idx = st_options.index(saved_st) if saved_st in st_options else 1
+                    st_preset = st.selectbox("SuperTrend (Period-Multiplier)", st_options, index=st_idx)
                     regime_value = st_preset
                 elif regime_type == "EQUITY":
                     eq_col1, eq_col2 = st.columns(2)
                     with eq_col1:
-                        realized_sl = st.number_input("DD SL % (Trigger)", 1, 50, 10,
+                        saved_sl = saved_regime.get('value', 10) if saved_regime.get('type') == 'EQUITY' else 10
+                        realized_sl = st.number_input("DD SL % (Trigger)", 1, 50, saved_sl,
                                                       help="Sell when drawdown exceeds this %")
                     with eq_col2:
-                        recovery_dd = st.number_input("Recovery DD %", 0, 49, 5,
+                        saved_recovery = saved_regime.get('recovery_dd', 5) or 5
+                        recovery_dd = st.number_input("Recovery DD %", 0, 49, saved_recovery,
                                                       help="Re-enter when drawdown below this %")
                     regime_value = realized_sl
                 else:  # EQUITY_MA
+                    ma_options = [20, 30, 50, 100, 200]
+                    saved_ma = saved_regime.get('ma_period', 50) if saved_regime.get('type') == 'EQUITY_MA' else 50
+                    ma_idx = ma_options.index(saved_ma) if saved_ma in ma_options else 2
                     ma_period = st.selectbox("Equity Curve MA Period", 
-                                            [20, 30, 50, 100, 200],
-                                            index=2,
+                                            ma_options,
+                                            index=ma_idx,
                                             help="Reduce exposure when equity falls below this MA")
                     regime_value = ma_period
                 
+                action_options = ["Go Cash", "Half Portfolio"]
+                saved_action = saved_regime.get('action', 'Go Cash')
+                action_idx = action_options.index(saved_action) if saved_action in action_options else 0
                 regime_action = st.selectbox("Regime Filter Action",
-                                            ["Go Cash", "Half Portfolio"],
+                                            action_options,
+                                            index=action_idx,
                                             help="Action when regime filter triggers")
                 
                 if regime_type not in ["EQUITY", "EQUITY_MA"]:
-                    regime_index = st.selectbox("Regime Filter Index", sorted(get_all_universe_names()))
+                    index_options = sorted(get_all_universe_names())
+                    saved_index = saved_regime.get('index', 'NIFTY 50')
+                    index_idx = index_options.index(saved_index) if saved_index in index_options else 0
+                    regime_index = st.selectbox("Regime Filter Index", index_options, index=index_idx)
                 else:
                     regime_index = None
                 
