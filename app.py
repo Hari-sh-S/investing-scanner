@@ -10,6 +10,7 @@ from nifty_universe import get_all_universe_names, get_universe, get_broad_marke
 from report_generator import create_excel_with_charts, create_pdf_report, prepare_complete_log_data
 from monte_carlo import MonteCarloSimulator, extract_trade_pnls, PortfolioMonteCarloSimulator, extract_monthly_returns
 import kite_trader
+import strategy_storage
 import datetime
 import io
 import time
@@ -174,6 +175,9 @@ main_tabs = st.tabs(["Backtest", "Backtest Logs", "Execute Trades", "Data Downlo
 
 # ==================== TAB 1: BACKTEST ====================
 with main_tabs[0]:
+    # Get loaded strategy config if present (shared between columns)
+    loaded_config = st.session_state.get('loaded_strategy_config', {})
+    
     col_config, col_scoring = st.columns([1, 1.2])
     
     with col_config:
@@ -185,9 +189,14 @@ with main_tabs[0]:
         # Get all available universes
         all_universes = sorted(get_all_universe_names()) + ["Custom"]
         
+        # Get default index for universe
+        default_universe = loaded_config.get('universe', 'NIFTY 100')
+        default_universe_idx = all_universes.index(default_universe) if default_universe in all_universes else 0
+        
         selected_universe = st.selectbox(
             "Select", 
             all_universes,
+            index=default_universe_idx,
             label_visibility="collapsed"
         )
         
@@ -202,75 +211,113 @@ with main_tabs[0]:
         st.markdown("**Portfolio Settings**")
         cap_col1, cap_col2 = st.columns(2)
         with cap_col1:
-            initial_capital = st.number_input("Capital (₹)", 10000, 100000000, 100000, 10000)
+            initial_capital = st.number_input("Capital (₹)", 10000, 100000000, 
+                                              loaded_config.get('initial_capital', 100000), 10000)
         with cap_col2:
-            num_stocks = st.number_input("Stocks", 1, 50, 5)
+            num_stocks = st.number_input("Stocks", 1, 50, 
+                                         loaded_config.get('num_stocks', 5))
         
         exit_col1, exit_col2 = st.columns(2)
         with exit_col1:
-            exit_rank = st.number_input("Exit Rank", num_stocks, 200, num_stocks * 2, 
+            default_exit = loaded_config.get('exit_rank', num_stocks * 2)
+            exit_rank = st.number_input("Exit Rank", num_stocks, 200, max(default_exit, num_stocks), 
                                         help="Stocks exit if they fall below this rank")
         with exit_col2:
-            reinvest_profits = st.checkbox("Reinvest Profits", value=True)
+            reinvest_profits = st.checkbox("Reinvest Profits", 
+                                           value=loaded_config.get('reinvest_profits', True))
         
         # Data Source selection
+        data_source_options = ["Yahoo Finance", "Broker API (Dhan)"]
+        default_ds = loaded_config.get('data_source', 'Yahoo Finance')
+        default_ds_idx = data_source_options.index(default_ds) if default_ds in data_source_options else 0
+        
         data_source = st.selectbox(
             "Data Source",
-            ["Yahoo Finance", "Broker API (Dhan)"],
-            index=0,
+            data_source_options,
+            index=default_ds_idx,
             help="Yahoo Finance: Free data with potential discrepancies. Broker API: Accurate data from Dhan (requires download first)"
         )
         
-        use_historical_universe = st.checkbox("Historical Universe (Beta)", value=False,
+        use_historical_universe = st.checkbox("Historical Universe (Beta)", 
+                                             value=loaded_config.get('use_historical_universe', False),
                                              help="Use point-in-time index constituents to avoid survivorship bias")
         
         # ===== TIME PERIOD & REBALANCING (in expander) =====
         with st.expander("📅 Time Period & Rebalancing", expanded=False):
             date_col1, date_col2 = st.columns(2)
             with date_col1:
-                start_date = st.date_input("Start Date", datetime.date(2020, 1, 1))
+                # Parse loaded dates if available
+                default_start = datetime.date(2020, 1, 1)
+                if loaded_config.get('start_date'):
+                    try:
+                        default_start = datetime.datetime.strptime(loaded_config['start_date'], '%Y-%m-%d').date()
+                    except:
+                        pass
+                start_date = st.date_input("Start Date", default_start)
             with date_col2:
-                end_date = st.date_input("End Date", datetime.date.today())
+                default_end = datetime.date.today()
+                if loaded_config.get('end_date'):
+                    try:
+                        default_end = datetime.datetime.strptime(loaded_config['end_date'], '%Y-%m-%d').date()
+                    except:
+                        pass
+                end_date = st.date_input("End Date", default_end)
             
             rebal_freq_options = ["Weekly", "Every 2 Weeks", "Monthly", "Bi-Monthly", "Quarterly", "Half-Yearly", "Annually"]
-            rebalance_label = st.selectbox("Frequency", rebal_freq_options, index=2)
+            default_rebal = loaded_config.get('rebalance_label', 'Monthly')
+            default_rebal_idx = rebal_freq_options.index(default_rebal) if default_rebal in rebal_freq_options else 2
+            rebalance_label = st.selectbox("Frequency", rebal_freq_options, index=default_rebal_idx)
             
             if rebalance_label == "Weekly":
-                rebal_day = st.selectbox("Rebalance Day", ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"])
+                day_options = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
+                default_day = loaded_config.get('rebal_day', 'Monday')
+                default_day_idx = day_options.index(default_day) if default_day in day_options else 0
+                rebal_day = st.selectbox("Rebalance Day", day_options, index=default_day_idx)
                 rebalance_date = None
             elif rebalance_label == "Every 2 Weeks":
-                rebal_day = st.selectbox("Rebalance Day", ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"])
+                day_options = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
+                default_day = loaded_config.get('rebal_day', 'Monday')
+                default_day_idx = day_options.index(default_day) if default_day in day_options else 0
+                rebal_day = st.selectbox("Rebalance Day", day_options, index=default_day_idx)
                 rebalance_date = None
             else:  # Monthly and above
-                rebalance_date = st.number_input("Rebalance Date (1-30)", 1, 30, 1,
+                rebalance_date = st.number_input("Rebalance Date (1-30)", 1, 30, 
+                                                loaded_config.get('rebalance_date', 1) or 1,
                                                 help="Day of month to rebalance portfolio")
                 rebal_day = None
             
+            alt_day_options = ["Previous Day", "Next Day"]
+            default_alt = loaded_config.get('alt_day_option', 'Next Day')
+            default_alt_idx = alt_day_options.index(default_alt) if default_alt in alt_day_options else 1
             alt_day_option = st.selectbox("If Holiday", 
-                                         ["Previous Day", "Next Day"],
-                                         index=1,
+                                         alt_day_options,
+                                         index=default_alt_idx,
                                          help="If rebalance day is holiday, use this option")
         
         # ===== POSITION SIZING (in expander) =====
         with st.expander("📊 Position Sizing", expanded=False):
+            sizing_options = ["Equal Weight", "Inverse Volatility", "Inverse Downside Vol", "Inverse Max Drawdown", "Score-Weighted", "Risk Parity"]
+            default_sizing = loaded_config.get('position_sizing_method', 'Equal Weight')
+            default_sizing_idx = sizing_options.index(default_sizing) if default_sizing in sizing_options else 0
+            
             position_sizing_method = st.selectbox(
                 "Sizing Method",
-                ["Equal Weight", "Inverse Volatility", "Inverse Downside Vol", "Inverse Max Drawdown", "Score-Weighted", "Risk Parity"],
-                index=0,
+                sizing_options,
+                index=default_sizing_idx,
                 help="Equal Weight: Divide equally | Inverse Volatility: Lower vol = higher weight | Inverse Downside Vol: Lower downside risk = higher weight | Inverse Max Drawdown: Lower drawdown = higher weight"
             )
             
             use_max_position_cap = st.checkbox(
                 "Apply Max Position Cap",
-                value=False,
+                value=loaded_config.get('use_max_position_cap', False),
                 help="Limit maximum allocation to any single stock"
             )
             
-            max_position_pct = 15  # Default
+            max_position_pct = loaded_config.get('max_position_pct', 15)
             if use_max_position_cap:
                 max_position_pct = st.number_input(
                     "Max Position %",
-                    5, 50, 15,
+                    5, 50, max_position_pct,
                     help="Maximum % of portfolio any single stock can hold"
                 )
         
@@ -366,10 +413,20 @@ with main_tabs[0]:
         parser = ScoreParser()
         examples = parser.get_example_formulas()
         
-        template = st.selectbox("Template", ["Custom"] + list(examples.keys()))
-        default = examples.get(template, "6 Month Performance")
+        # Get default template from loaded config
+        template_options = ["Custom"] + list(examples.keys())
+        default_template = loaded_config.get('template', 'Custom')
+        default_template_idx = template_options.index(default_template) if default_template in template_options else 0
         
-        formula = st.text_area("Scoring Formula", default, height=100)
+        template = st.selectbox("Template", template_options, index=default_template_idx)
+        
+        # Get formula - either from loaded config or from template
+        if loaded_config.get('formula') and default_template_idx == template_options.index(template):
+            default_formula = loaded_config.get('formula', "6 Month Performance")
+        else:
+            default_formula = examples.get(template, "6 Month Performance")
+        
+        formula = st.text_area("Scoring Formula", default_formula, height=100)
         
         valid, msg = parser.validate_formula(formula)
         if valid:
@@ -411,6 +468,88 @@ with main_tabs[0]:
                 st.markdown(text, unsafe_allow_html=True)
         
         st.markdown("---")
+        
+        # ===== STRATEGY SAVE/LOAD =====
+        if strategy_storage.is_strategy_storage_configured():
+            st.markdown("**💾 Strategy Templates**")
+            
+            # Get saved strategies
+            saved_strategies = strategy_storage.list_strategies()
+            strategy_options = ["-- Select Saved Strategy --"] + saved_strategies
+            
+            # Strategy dropdown
+            selected_strategy = st.selectbox(
+                "Load Strategy",
+                strategy_options,
+                key="strategy_selector",
+                label_visibility="collapsed"
+            )
+            
+            # Handle strategy loading
+            if selected_strategy != "-- Select Saved Strategy --" and selected_strategy:
+                if st.session_state.get('last_loaded_strategy') != selected_strategy:
+                    loaded_config = strategy_storage.load_strategy(selected_strategy)
+                    if loaded_config:
+                        st.session_state['loaded_strategy_config'] = loaded_config
+                        st.session_state['last_loaded_strategy'] = selected_strategy
+                        st.success(f"✅ Loaded: {selected_strategy}")
+                        st.rerun()
+            
+            # Save and Delete buttons in columns
+            save_col, delete_col = st.columns(2)
+            
+            with save_col:
+                with st.popover("💾 Save Strategy", use_container_width=True):
+                    strategy_name = st.text_input("Strategy Name", key="new_strategy_name")
+                    
+                    if st.button("Save", key="save_strategy_btn", type="primary"):
+                        if strategy_name:
+                            # Collect current configuration
+                            current_config = {
+                                'universe': selected_universe,
+                                'initial_capital': initial_capital,
+                                'num_stocks': num_stocks,
+                                'exit_rank': exit_rank,
+                                'reinvest_profits': reinvest_profits,
+                                'data_source': data_source,
+                                'use_historical_universe': use_historical_universe,
+                                'start_date': str(start_date),
+                                'end_date': str(end_date),
+                                'rebalance_label': rebalance_label,
+                                'rebalance_date': rebalance_date,
+                                'rebal_day': rebal_day,
+                                'alt_day_option': alt_day_option,
+                                'position_sizing_method': position_sizing_method,
+                                'use_max_position_cap': use_max_position_cap,
+                                'max_position_pct': max_position_pct,
+                                'use_regime_filter': use_regime_filter,
+                                'regime_config': regime_config,
+                                'formula': formula,
+                                'template': template
+                            }
+                            
+                            if strategy_storage.save_strategy(strategy_name, current_config):
+                                st.success(f"✅ Saved: {strategy_name}")
+                                st.rerun()
+                        else:
+                            st.warning("Enter a strategy name")
+            
+            with delete_col:
+                if saved_strategies:
+                    with st.popover("🗑️ Delete", use_container_width=True):
+                        delete_strategy = st.selectbox(
+                            "Select to delete",
+                            saved_strategies,
+                            key="delete_strategy_select"
+                        )
+                        if st.button("Delete", key="delete_strategy_btn", type="secondary"):
+                            if strategy_storage.delete_strategy(delete_strategy):
+                                st.success(f"✅ Deleted: {delete_strategy}")
+                                st.session_state['last_loaded_strategy'] = None
+                                st.rerun()
+            
+            st.markdown("---")
+        
         run_btn = st.button("🚀 Run Backtest", type="primary", use_container_width=True)
     
     # Results Section
