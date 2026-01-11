@@ -1,0 +1,131 @@
+{
+    "index": "NIFTY100",
+    "description": "NIFTY 100 = NIFTY 50 + NIFTY NEXT 50. Changes reflect stocks entering/exiting the combined index.",
+    "changes": [
+        {
+            "effective_date": "2024-09-30",
+            "additions": [
+                "BHEL",
+                "JSWENERGY",
+                "LODHA",
+                "NHPC",
+                "UNIONBANK"
+            ],
+            "exclusions": [
+                "BERGEPAINT",
+                "COLPAL",
+                "MARICO",
+                "SBICARD",
+                "SRF"
+            ],
+            "source": "Economic Times / NSE Indices September 2024"
+        },
+        {
+            "effective_date": "2024-03-28",
+            "additions": [
+                "ADANIPOWER",
+                "IRFC",
+                "JIOFIN",
+                "PFC",
+                "RECLTD",
+                "SHRIRAMFIN"
+            ],
+            "exclusions": [
+                "AWL",
+                "MUTHOOTFIN",
+                "PIIND",
+                "PGHH",
+                "UPL"
+            ],
+            "source": "Business Standard / NSE Indices March 2024",
+            "notes": "SHRIRAMFIN moved to NIFTY 50 from NIFTY NEXT 50"
+        },
+        {
+            "effective_date": "2023-09-29",
+            "additions": [
+                "PNB",
+                "SHRIRAMFIN",
+                "TRENT",
+                "TVSMOTOR",
+                "ZYDUSLIFE",
+                "TATAMTRDVR"
+            ],
+            "exclusions": [
+                "ACC",
+                "NYKAA",
+                "HDFCAMC",
+                "INDUSTOWER",
+                "PAGEIND"
+            ],
+            "source": "NSE Indices September 2023"
+        },
+        {
+            "effective_date": "2023-03-31",
+            "additions": [
+                "ABB",
+                "AWL",
+                "CANBK",
+                "PAGEIND",
+                "VBL"
+            ],
+            "exclusions": [
+                "BANDHANBNK",
+                "BIOCON",
+                "GLANDPHARMA",
+                "MPHASIS",
+                "PAYTM"
+            ],
+            "source": "TradingQnA / NSE Indices March 2023",
+            "notes": "These were NIFTY NEXT 50 changes affecting NIFTY 100 boundary"
+        },
+        {
+            "effective_date": "2022-09-30",
+            "additions": [
+                "ADANIENT",
+                "ATGL",
+                "BEL",
+                "HAL"
+            ],
+            "exclusions": [
+                "SHREECEM",
+                "JUBLFOOD",
+                "LUPIN",
+                "SAIL",
+                "ZYDUSLIFE"
+            ],
+            "source": "TradingQnA / Fisdom September 2022",
+            "notes": "ADANIENT moved from NIFTY NEXT 50 to NIFTY 50"
+        },
+        {
+            "effective_date": "2022-03-31",
+            "additions": [
+                "NYKAA",
+                "MINDTREE",
+                "PAYTM",
+                "SRF",
+                "ZOMATO",
+                "IOC"
+            ],
+            "exclusions": [
+                "AUROPHARMA",
+                "HINDPETRO",
+                "APOLLOHOSP",
+                "JINDALSTEL",
+                "IGL"
+            ],
+            "source": "Investing.com / Financial Express March 2022",
+            "notes": "APOLLOHOSP moved to NIFTY 50, IOC moved to NIFTY NEXT 50"
+        },
+        {
+            "effective_date": "2020-03-19",
+            "additions": [],
+            "exclusions": [
+                "YESBANK"
+            ],
+            "source": "NSE Indices March 2020",
+            "notes": "Emergency removal due to Yes Bank crisis"
+        }
+    ],
+    "last_updated": "2026-01-10",
+    "data_source": "Compiled from NSE Indices press releases and financial news sources"
+}
