@@ -1,7 +1,45 @@
 {
     "index": "NIFTY100",
-    "description": "NIFTY 100 = NIFTY 50 + NIFTY NEXT 50. Changes reflect stocks entering/exiting the combined index.",
+    "description": "NIFTY 100 = NIFTY 50 + NIFTY NEXT 50. Changes reflect stocks entering/exiting the combined index. Internal moves between N50 and Next50 are ignored.",
     "changes": [
+        {
+            "effective_date": "2025-09-30",
+            "additions": [
+                "HINDZINC",
+                "MAZDOCK",
+                "ENRIN",
+                "SOLARINDS",
+                "MAXHEALTH"
+            ],
+            "exclusions": [
+                "DABUR",
+                "ICICIPRULI",
+                "SWIGGY",
+                "HEROMOTOCO",
+                "INDUSINDBK"
+            ],
+            "source": "Trendlyne / TradeBrains September 2025",
+            "notes": "Assumed MAXHEALTH entered N50 from outside. HERO/INDUSIND left N100."
+        },
+        {
+            "effective_date": "2025-03-28",
+            "additions": [
+                "BAJAJHFL",
+                "CGPOWER",
+                "HYUNDAI",
+                "INDHOTEL",
+                "SWIGGY"
+            ],
+            "exclusions": [
+                "NHPC",
+                "IRCTC",
+                "ATGL",
+                "UNIONBANK",
+                "BHEL"
+            ],
+            "source": "Rediff / LiveMint March 2025",
+            "notes": "ZOMATO/JIOFIN (Next50->N50) and BPCL/BRITANNIA (N50->Next50) are internal."
+        },
         {
             "effective_date": "2024-09-30",
             "additions": [
@@ -27,8 +65,7 @@
                 "IRFC",
                 "JIOFIN",
                 "PFC",
-                "RECLTD",
-                "SHRIRAMFIN"
+                "RECLTD"
             ],
             "exclusions": [
                 "AWL",
@@ -37,8 +74,8 @@
                 "PGHH",
                 "UPL"
             ],
-            "source": "Business Standard / NSE Indices March 2024",
-            "notes": "SHRIRAMFIN moved to NIFTY 50 from NIFTY NEXT 50"
+            "source": "NSE Indices March 2024",
+            "notes": "SHRIRAMFIN (Next50->N50) and UPL (N50->out) handled correctly."
         },
         {
             "effective_date": "2023-09-29",
@@ -47,8 +84,7 @@
                 "SHRIRAMFIN",
                 "TRENT",
                 "TVSMOTOR",
-                "ZYDUSLIFE",
-                "TATAMTRDVR"
+                "ZYDUSLIFE"
             ],
             "exclusions": [
                 "ACC",
@@ -57,7 +93,8 @@
                 "INDUSTOWER",
                 "PAGEIND"
             ],
-            "source": "NSE Indices September 2023"
+            "source": "NSE Indices September 2023",
+            "notes": "TATAMTRDVR is excluded from counts (DVR/internal)."
         },
         {
             "effective_date": "2023-03-31",
@@ -75,57 +112,63 @@
                 "MPHASIS",
                 "PAYTM"
             ],
-            "source": "TradingQnA / NSE Indices March 2023",
-            "notes": "These were NIFTY NEXT 50 changes affecting NIFTY 100 boundary"
+            "source": "TradingQnA / NSE Indices March 2023"
         },
         {
             "effective_date": "2022-09-30",
             "additions": [
-                "ADANIENT",
                 "ATGL",
                 "BEL",
-                "HAL"
+                "HAL",
+                "IRCTC",
+                "MPHASIS",
+                "MOTHERSON"
             ],
             "exclusions": [
-                "SHREECEM",
                 "JUBLFOOD",
                 "LUPIN",
+                "MINDTREE",
+                "PNB",
                 "SAIL",
                 "ZYDUSLIFE"
             ],
             "source": "TradingQnA / Fisdom September 2022",
-            "notes": "ADANIENT moved from NIFTY NEXT 50 to NIFTY 50"
+            "notes": "ADANIENT (Next50->N50) and SHREECEM (N50->Next50) are internal."
         },
         {
-            "effective_date": "2022-03-31",
+            "effective_date": "2021-03-31",
             "additions": [
-                "NYKAA",
-                "MINDTREE",
-                "PAYTM",
-                "SRF",
-                "ZOMATO",
-                "IOC"
+                "ADANIENT",
+                "APOLLOHOSP",
+                "GAIL",
+                "JUBLFOOD",
+                "MRF",
+                "VEDL",
+                "YESBANK"
             ],
             "exclusions": [
-                "AUROPHARMA",
-                "HINDPETRO",
-                "APOLLOHOSP",
-                "JINDALSTEL",
-                "IGL"
+                "BANKBARODA",
+                "CONCOR",
+                "GICRE",
+                "HINDZINC",
+                "OFSS",
+                "PFC",
+                "TATACONSUM"
             ],
-            "source": "Investing.com / Financial Express March 2022",
-            "notes": "APOLLOHOSP moved to NIFTY 50, IOC moved to NIFTY NEXT 50"
+            "source": "Business Standard March 2021"
         },
         {
             "effective_date": "2020-03-19",
-            "additions": [],
+            "additions": [
+                "ADANIENSOL"
+            ],
             "exclusions": [
                 "YESBANK"
             ],
             "source": "NSE Indices March 2020",
-            "notes": "Emergency removal due to Yes Bank crisis"
+            "notes": "Emergency removal of YESBANK. Replaced by SHREECEM (Next50->N50). ADANITRANS added to Next50."
         }
     ],
-    "last_updated": "2026-01-10",
-    "data_source": "Compiled from NSE Indices press releases and financial news sources"
+    "last_updated": "2026-01-12",
+    "data_source": "Compiled from NSE Indices press releases and verification logic"
 }
