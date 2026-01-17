@@ -1447,12 +1447,12 @@ class PortfolioEngine:
                                     if not period_data.empty and 'Low' in period_data.columns:
                                         # Use Low for Long trades (assuming Long only system for now)
                                         # If we support shorting, we'd use High
-                                        min_price = period_data['Low'].min()
-                                        buy_price = buy_row['Price']
+                                        min_price = float(period_data['Low'].min())
+                                        buy_price = float(buy_row['Price'])
                                         
                                         if buy_price > 0:
                                             mae = (min_price - buy_price) / buy_price
-                                            trade_maes.append(mae)
+                                            trade_maes.append(float(mae))
                             except Exception as e:
                                 # Fail silently for MAE calc to not break backtest
                                 pass
