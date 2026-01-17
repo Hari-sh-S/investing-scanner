@@ -1378,6 +1378,8 @@ class PortfolioEngine:
         current_streak = 0
         last_was_win = None
         total_trades = 0
+        trade_returns = []
+        trade_maes = []
         
         if not self.trades_df.empty and 'Action' in self.trades_df.columns:
             # Get BUY and SELL trades
@@ -1424,6 +1426,36 @@ class PortfolioEngine:
                                     current_streak = 1
                                 max_consecutive_losses = max(max_consecutive_losses, current_streak)
                                 last_was_win = False
+                                
+                            # --- New Risk Metrics (MAE & Returns) ---
+                            trade_ret = pnl / buy_value if buy_value > 0 else 0
+                            trade_returns.append(trade_ret)
+                            
+                            # Calculate MAE (Maximum Adverse Excursion)
+                            # Worst unrealized loss during the trade
+                            try:
+                                if ticker in self.data:
+                                    # Ensure we have data for the period
+                                    ticker_data = self.data[ticker]
+                                    buy_date = buy_row['Date']
+                                    sell_date = date # sell_row['Date']
+                                    
+                                    # Slice data from entry to exit (inclusive)
+                                    mask = (ticker_data.index >= buy_date) & (ticker_data.index <= sell_date)
+                                    period_data = ticker_data[mask]
+                                    
+                                    if not period_data.empty and 'Low' in period_data.columns:
+                                        # Use Low for Long trades (assuming Long only system for now)
+                                        # If we support shorting, we'd use High
+                                        min_price = period_data['Low'].min()
+                                        buy_price = buy_row['Price']
+                                        
+                                        if buy_price > 0:
+                                            mae = (min_price - buy_price) / buy_price
+                                            trade_maes.append(mae)
+                            except Exception as e:
+                                # Fail silently for MAE calc to not break backtest
+                                pass
             
             win_rate = (wins / total_trades * 100) if total_trades > 0 else 0
         else:
@@ -1493,6 +1525,19 @@ class PortfolioEngine:
         gst = (transaction_charges + sebi_charges) * 0.18  # 18% GST
         
         total_charges = stt_ctt + transaction_charges + sebi_charges + stamp_charges + gst
+        
+        # Calculate Risk Metrics Stats
+        mae_median = np.median(trade_maes) * 100 if trade_maes else 0
+        mae_95 = np.percentile(trade_maes, 5) * 100 if trade_maes else 0  # 5th percentile because MAE is negative
+        mae_max = np.min(trade_maes) * 100 if trade_maes else 0
+        
+        # Calculate CVaR (5%)
+        cvar_5 = 0
+        if trade_returns:
+            returns_array = np.array(trade_returns)
+            cutoff = np.percentile(returns_array, 5)
+            tail_losses = returns_array[returns_array <= cutoff]
+            cvar_5 = tail_losses.mean() * 100 if len(tail_losses) > 0 else 0
 
         return {
             'Final Value': final_value,
@@ -1520,6 +1565,11 @@ class PortfolioEngine:
             'Stamp Charges': stamp_charges,
             'GST': gst,
             'Total Charges': total_charges,
+            # Risk Metrics
+            'MAE Median %': mae_median,
+            'MAE 95% %': mae_95,
+            'MAE Max %': mae_max,
+            'CVaR 5% %': cvar_5
         }
 
     def get_monthly_returns(self):

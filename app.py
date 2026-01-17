@@ -868,7 +868,17 @@ with main_tabs[0]:
                             adv_col3.metric("Trades to Recover from DD", metrics.get('Trades to Recover from DD', 0))
                             
                             adv_col4.metric("Total Turnover", f"₹{metrics.get('Total Turnover', 0):,.0f}")
-                            adv_col4.metric("Total Charges (Zerodha)", f"₹{metrics.get('Total Charges', 0):,.0f}")
+                            adv_col4.metric("Consolidated Charges", f"₹{metrics.get('Total Charges', 0):,.0f}")
+                            
+                            # Risk Metrics Row
+                            st.markdown("---")
+                            st.markdown("**⚠️ Risk Analysis**")
+                            risk_col1, risk_col2, risk_col3, risk_col4 = st.columns(4)
+                            
+                            risk_col1.metric("Median MAE", f"{metrics.get('MAE Median %', 0):.2f}%", help="Typical worst unrealized loss during a trade")
+                            risk_col2.metric("95% MAE", f"{metrics.get('MAE 95% %', 0):.2f}%", help="95% of trades never go worse than this drawdown")
+                            risk_col3.metric("Max MAE", f"{metrics.get('MAE Max %', 0):.2f}%", help="Worst single trade unrealized drawdown")
+                            risk_col4.metric("CVaR (5%)", f"{metrics.get('CVaR 5% %', 0):.2f}%", help="Average loss of the worst 5% of trades (Expected Shortfall)")
                             
                             # Charges Breakdown Expander
                             with st.expander("📋 Zerodha Charges Breakdown"):
