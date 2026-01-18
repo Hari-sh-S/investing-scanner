@@ -1021,7 +1021,9 @@ class PortfolioEngine:
                         # 0% to stocks, uncorrelated gets its % from total, rest is cash
                         stocks_target = 0.0
                         if uncorrelated_config:
-                            allocation_pct = uncorrelated_config['allocation_pct'] / 100.0
+                            # Support both old 'allocation_pct' and new 'total_pct' format
+                            total_alloc = uncorrelated_config.get('total_pct', uncorrelated_config.get('allocation_pct', 100))
+                            allocation_pct = total_alloc / 100.0
                             uncorrelated_target = investable_capital * allocation_pct
                         regime_active = True
                         
@@ -1029,7 +1031,9 @@ class PortfolioEngine:
                         # ALWAYS 50% to stocks, uncorrelated from remaining 50%
                         stocks_target = investable_capital * 0.5
                         if uncorrelated_config:
-                            allocation_pct = uncorrelated_config['allocation_pct'] / 100.0
+                            # Support both old 'allocation_pct' and new 'total_pct' format
+                            total_alloc = uncorrelated_config.get('total_pct', uncorrelated_config.get('allocation_pct', 100))
+                            allocation_pct = total_alloc / 100.0
                             # Uncorrelated from the OTHER 50% (cash reserve)
                             uncorrelated_target = (investable_capital * 0.5) * allocation_pct
                         regime_active = True
