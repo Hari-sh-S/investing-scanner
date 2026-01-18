@@ -2364,6 +2364,50 @@ with main_tabs[3]:
     st.markdown("### 📊 Broker API Data (Dhan)")
     st.info("Download historical data from Dhan API and store in Hugging Face for use in backtests. This provides more accurate data than Yahoo Finance.")
     
+    # Dhan API Authentication Check Button
+    if st.button("🔐 Check Dhan API Access", key="check_dhan_api_btn"):
+        with st.spinner("Checking Dhan API credentials..."):
+            try:
+                from config import validate_credentials, get_dhan_client, DHAN_CLIENT_ID
+                
+                # Step 1: Check credentials are configured
+                validate_credentials()
+                st.success(f"✅ Credentials configured (Client ID: {DHAN_CLIENT_ID[:4]}...{DHAN_CLIENT_ID[-4:]})")
+                
+                # Step 2: Try to create client and fetch test data
+                dhan = get_dhan_client()
+                st.success("✅ Dhan client created successfully")
+                
+                # Step 3: Try a test API call (historical data for RELIANCE)
+                from datetime import date, timedelta
+                test_date = date.today() - timedelta(days=7)
+                response = dhan.historical_daily_data(
+                    security_id="1333",  # RELIANCE security ID
+                    exchange_segment='NSE_EQ',
+                    instrument_type='EQUITY',
+                    from_date=test_date.strftime('%Y-%m-%d'),
+                    to_date=date.today().strftime('%Y-%m-%d')
+                )
+                
+                if response.get('status') == 'success':
+                    data = response.get('data', {})
+                    data_points = len(data.get('timestamp', []))
+                    st.success(f"✅ API test passed! Fetched {data_points} data points for RELIANCE")
+                    st.balloons()
+                else:
+                    st.error(f"❌ API test failed: {response.get('remarks', 'Unknown error')}")
+                    
+            except ValueError as e:
+                st.error(f"❌ Credentials not configured: {e}")
+                st.info("Add DHAN_CLIENT_ID and DHAN_ACCESS_TOKEN to your .env file")
+            except ImportError as e:
+                st.error(f"❌ dhanhq SDK not installed: {e}")
+                st.code("pip install dhanhq", language="bash")
+            except Exception as e:
+                st.error(f"❌ API Error: {e}")
+    
+    st.markdown("")  # Spacing
+    
     # Check HF configuration
     from huggingface_manager import is_hf_configured
     hf_configured = is_hf_configured()
