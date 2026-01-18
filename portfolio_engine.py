@@ -581,8 +581,59 @@ class PortfolioEngine:
                 if rebalance_date:
                     rebalance_dates.append(rebalance_date)
         
+        
         print(f"Generated {len(rebalance_dates)} rebalance dates from {len(all_dates)} trading days ({freq})")
         return sorted(rebalance_dates)
+
+    def _check_stock_regime_filter(self, ticker, date, regime_config):
+        """Check if regime filter is triggered for a specific stock.
+        
+        Used when regime_config['index'] == 'Stock' to apply per-stock filtering.
+        
+        Returns: (triggered: bool)
+        """
+        if ticker not in self.data:
+            return False
+        
+        df = self.data[ticker]
+        if date not in df.index:
+            return False
+        
+        row = df.loc[date]
+        regime_type = regime_config['type']
+        
+        # Helper to extract scalar from potential Series
+        def get_scalar(val):
+            if hasattr(val, 'iloc'):
+                return float(val.iloc[0])
+            return float(val) if val is not None else 0.0
+        
+        if regime_type == 'EMA':
+            ema_period = regime_config['value']
+            ema_col = f'EMA_{ema_period}'
+            close_price = get_scalar(row.get('Close', 0))
+            ema_value = get_scalar(row.get(ema_col, 0))
+            
+            # Triggered when stock closes BELOW its EMA
+            if ema_col in row.index and ema_value > 0 and close_price < ema_value:
+                return True
+        
+        elif regime_type == 'MACD':
+            macd_val = get_scalar(row.get('MACD', 0))
+            signal_val = get_scalar(row.get('MACD_Signal', 0))
+            # Triggered when MACD is below signal line
+            if macd_val < signal_val:
+                return True
+        
+        elif regime_type == 'SUPERTREND':
+            st_direction = row.get('Supertrend_Direction', 'BUY')
+            if hasattr(st_direction, 'iloc'):
+                st_direction = st_direction.iloc[0]
+            # Triggered when SuperTrend says SELL
+            if st_direction == 'SELL':
+                return True
+        
+        return False
 
     def _check_regime_filter(self, date, regime_config, current_equity=0, peak_equity=0):
         """Check if regime filter is triggered.
@@ -691,8 +742,8 @@ class PortfolioEngine:
         # Calculate indicators on-demand based on formula
         self.calculate_indicators_for_formula(scoring_formula, regime_config)
         
-        # Load regime filter index data if needed
-        if regime_config and regime_config['type'] != 'EQUITY':
+        # Load regime filter index data if needed (skip for EQUITY, EQUITY_MA, and Stock-level filtering)
+        if regime_config and regime_config['type'] not in ['EQUITY', 'EQUITY_MA'] and regime_config.get('index') != 'Stock':
             regime_index = regime_config['index']
             # Map universe names to Yahoo Finance tickers
             index_map = {
@@ -922,7 +973,16 @@ class PortfolioEngine:
                         print(f"⏳ EQUITY REGIME STILL ACTIVE [{date.date()}]: Theoretical Drawdown={theoretical_drawdown:.2f}% > Recovery Threshold={recovery_dd_pct}%")
                 
                 # Check regime filter for non-EQUITY types, or use equity_regime_active for EQUITY type
-                if is_equity_regime:
+                # For Stock-level filtering, per-stock filtering happens during buy phase, not here
+                is_stock_regime = regime_config and regime_config.get('index') == 'Stock'
+                
+                if is_stock_regime:
+                    # Stock-level regime: don't trigger portfolio-wide regime
+                    # Individual stocks are filtered during the buy phase
+                    regime_triggered = False
+                    regime_action = 'none'
+                    current_drawdown = 0.0
+                elif is_equity_regime:
                     regime_triggered = equity_regime_active
                     regime_action = regime_config['action'] if equity_regime_active else 'none'
                     current_drawdown = ((peak_equity - current_equity) / peak_equity) * 100 if peak_equity > 0 else 0
@@ -1087,6 +1147,20 @@ class PortfolioEngine:
                 
                 # Select top N stocks
                 top_stocks = ranked_stocks[:num_stocks]
+                
+                # Stock-level regime filter: exclude stocks that fail their individual regime filter
+                is_stock_regime = regime_config and regime_config.get('index') == 'Stock'
+                if is_stock_regime and top_stocks:
+                    filtered_top_stocks = []
+                    for ticker, score in top_stocks:
+                        if not self._check_stock_regime_filter(ticker, date, regime_config):
+                            filtered_top_stocks.append((ticker, score))
+                        else:
+                            print(f"   [STOCK REGIME] Excluding {ticker} - price below {regime_config['type']} {regime_config['value']}")
+                    
+                    if len(filtered_top_stocks) < len(top_stocks):
+                        print(f"   [STOCK REGIME] {len(top_stocks) - len(filtered_top_stocks)} stocks filtered out, {len(filtered_top_stocks)} remaining")
+                    top_stocks = filtered_top_stocks
                 
                 # Buy stocks with available_for_stocks amount
                 if top_stocks and available_for_stocks > 0:

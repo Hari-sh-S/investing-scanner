@@ -399,7 +399,7 @@ with main_tabs[0]:
                                             help="Action when regime filter triggers")
                 
                 if regime_type not in ["EQUITY", "EQUITY_MA"]:
-                    index_options = sorted(get_all_universe_names())
+                    index_options = ["Stock"] + sorted(get_all_universe_names())
                     saved_index = saved_regime.get('index', 'NIFTY 50')
                     index_idx = index_options.index(saved_index) if saved_index in index_options else 0
                     regime_index = st.selectbox("Regime Filter Index", index_options, index=index_idx)
