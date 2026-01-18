@@ -418,19 +418,61 @@ with main_tabs[0]:
                 # Uncorrelated Asset
                 st.markdown("---")
                 use_uncorrelated = st.checkbox("Invest in Uncorrelated Asset", value=False,
-                                              help="Allocate to uncorrelated asset when regime triggers")
+                                              help="Allocate to uncorrelated assets when regime triggers")
                 
                 uncorrelated_config = None
                 if use_uncorrelated:
-                    unc_col1, unc_col2 = st.columns(2)
-                    with unc_col1:
-                        asset_type = st.selectbox("Asset Ticker", ["GOLDBEES", "JUNIORBEES", "NIFTYBEES", "SILVERBEES"])
-                    with unc_col2:
-                        allocation_pct = st.number_input("Alloc %", 1, 100, 100)
+                    st.caption("Add assets to allocate when regime triggers (allocations should sum to 100%)")
+                    
+                    # Initialize session state for assets list
+                    if 'uncorrelated_assets' not in st.session_state:
+                        st.session_state.uncorrelated_assets = [{'ticker': 'GOLDBEES', 'pct': 100}]
+                    
+                    available_assets = ["GOLDBEES", "JUNIORBEES", "NIFTYBEES", "SILVERBEES", "BANKBEES", "LIQUIDBEES"]
+                    
+                    # Display current assets
+                    assets_to_remove = []
+                    for i, asset in enumerate(st.session_state.uncorrelated_assets):
+                        col1, col2, col3 = st.columns([3, 2, 1])
+                        with col1:
+                            current_idx = available_assets.index(asset['ticker']) if asset['ticker'] in available_assets else 0
+                            new_ticker = st.selectbox(f"Asset {i+1}", available_assets, 
+                                                      index=current_idx,
+                                                      key=f"unc_asset_{i}")
+                            st.session_state.uncorrelated_assets[i]['ticker'] = new_ticker
+                        with col2:
+                            new_pct = st.number_input(f"Alloc %", 1, 100, asset['pct'], key=f"unc_pct_{i}")
+                            st.session_state.uncorrelated_assets[i]['pct'] = new_pct
+                        with col3:
+                            st.markdown("<br>", unsafe_allow_html=True)  # Spacing
+                            if len(st.session_state.uncorrelated_assets) > 1:
+                                if st.button("🗑️", key=f"remove_unc_{i}"):
+                                    assets_to_remove.append(i)
+                    
+                    # Remove marked assets
+                    for i in sorted(assets_to_remove, reverse=True):
+                        st.session_state.uncorrelated_assets.pop(i)
+                        st.rerun()
+                    
+                    # Add asset button
+                    if len(st.session_state.uncorrelated_assets) < 4:
+                        if st.button("➕ Add Asset", key="add_unc_asset"):
+                            # Default new asset with equal split
+                            num_assets = len(st.session_state.uncorrelated_assets) + 1
+                            default_pct = 100 // num_assets
+                            st.session_state.uncorrelated_assets.append({'ticker': 'SILVERBEES', 'pct': default_pct})
+                            st.rerun()
+                    
+                    # Show total allocation
+                    total_pct = sum(a['pct'] for a in st.session_state.uncorrelated_assets)
+                    if total_pct != 100:
+                        st.warning(f"⚠️ Total allocation: {total_pct}% (should sum to 100%)")
+                    else:
+                        st.success(f"✅ Total allocation: {total_pct}%")
                     
                     uncorrelated_config = {
-                        'asset': asset_type,
-                        'allocation_pct': allocation_pct
+                        'assets': [{'ticker': a['ticker'], 'pct': a['pct']} for a in st.session_state.uncorrelated_assets],
+                        'total_pct': total_pct
                     }
             else:
                 uncorrelated_config = None

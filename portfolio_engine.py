@@ -1045,54 +1045,72 @@ class PortfolioEngine:
                 else:
                     print(f"REBALANCE {date.date()}: REGIME={regime_triggered} - stocks={stocks_target:.0f}")
                 
-                # Execute uncorrelated asset purchase with calculated target
+                # Execute uncorrelated asset purchases (supports multiple assets)
                 if uncorrelated_target > 0 and uncorrelated_config:
-                    uncorrelated_asset = uncorrelated_config['asset']
+                    # Support both old format {'asset': 'X', 'allocation_pct': N} and new {'assets': [...]}
+                    assets_list = uncorrelated_config.get('assets', [])
                     
-                    # Download if needed
-                    if uncorrelated_asset not in self.data:
-                        try:
-                            ticker_ns = uncorrelated_asset if uncorrelated_asset.endswith(('.NS', '.BO')) else f"{uncorrelated_asset}.NS"
-                            unc_df = yf.download(ticker_ns, start=self.start_date, end=self.end_date, progress=False, auto_adjust=True)
-                            if not unc_df.empty:
-                                unc_df.reset_index(inplace=True)
-                                unc_df['Date'] = pd.to_datetime(unc_df['Date'])
-                                unc_df.set_index('Date', inplace=True)
-                                # Reindex to all trading dates and forward-fill gaps (e.g. Oct 24 GOLDBEES)
-                                # Use ffill then bfill to handle gaps at start and middle
-                                unc_df = unc_df.reindex(all_dates).ffill().bfill()
-                                self.data[uncorrelated_asset] = unc_df
-                        except Exception as e:
-                            print(f"Could not download {uncorrelated_asset}: {e}")
+                    # Backward compatibility: handle old single-asset config
+                    if not assets_list and 'asset' in uncorrelated_config:
+                        assets_list = [{'ticker': uncorrelated_config['asset'], 'pct': 100}]
                     
-                    # Buy uncorrelated asset
-                    if uncorrelated_asset in self.data and date in self.data[uncorrelated_asset].index:
-                        unc_price = self._get_scalar(self.data[uncorrelated_asset].loc[date, 'Close'])
-                        unc_shares = int(uncorrelated_target / unc_price)
+                    for asset_config in assets_list:
+                        asset_ticker = asset_config['ticker']
+                        asset_pct = asset_config['pct'] / 100.0  # Convert to decimal
+                        asset_target = uncorrelated_target * asset_pct
                         
-                        if unc_shares > 0:
-                            unc_cost = unc_shares * unc_price
-                            cash -= unc_cost
-                            holdings[uncorrelated_asset] = unc_shares
+                        # Download if needed
+                        if asset_ticker not in self.data:
+                            try:
+                                ticker_ns = asset_ticker if asset_ticker.endswith(('.NS', '.BO')) else f"{asset_ticker}.NS"
+                                unc_df = yf.download(ticker_ns, start=self.start_date, end=self.end_date, progress=False, auto_adjust=True)
+                                if not unc_df.empty:
+                                    unc_df.reset_index(inplace=True)
+                                    unc_df['Date'] = pd.to_datetime(unc_df['Date'])
+                                    unc_df.set_index('Date', inplace=True)
+                                    # Reindex to all trading dates and forward-fill gaps
+                                    unc_df = unc_df.reindex(all_dates).ffill().bfill()
+                                    self.data[asset_ticker] = unc_df
+                            except Exception as e:
+                                print(f"Could not download {asset_ticker}: {e}")
+                        
+                        # Buy uncorrelated asset
+                        if asset_ticker in self.data and date in self.data[asset_ticker].index:
+                            unc_price = self._get_scalar(self.data[asset_ticker].loc[date, 'Close'])
+                            unc_shares = int(asset_target / unc_price)
                             
-                            self.trades.append({
-                                'Date': date,
-                                'Ticker': uncorrelated_asset,
-                                'Action': 'BUY',
-                                'Shares': unc_shares,
-                                'Price': unc_price,
-                                'Value': unc_cost,
-                                'Score': 0,
-                                'Rank': 'Uncorrelated'
-                            })
+                            if unc_shares > 0:
+                                unc_cost = unc_shares * unc_price
+                                cash -= unc_cost
+                                # Add to existing holdings or create new
+                                holdings[asset_ticker] = holdings.get(asset_ticker, 0) + unc_shares
+                                
+                                self.trades.append({
+                                    'Date': date,
+                                    'Ticker': asset_ticker,
+                                    'Action': 'BUY',
+                                    'Shares': unc_shares,
+                                    'Price': unc_price,
+                                    'Value': unc_cost,
+                                    'Score': 0,
+                                    'Rank': 'Uncorrelated'
+                                })
                 
                 # stocks_target is now the amount available for stocks
                 available_for_stocks = stocks_target
                 
                 # Calculate scores for all stocks - OPTIMIZED VECTORIZED VERSION
-                # Exclude uncorrelated asset from stock scoring
+                # Exclude uncorrelated assets from stock scoring
                 scores = {}
-                uncorrelated_asset_ticker = uncorrelated_config['asset'] if uncorrelated_config else None
+                
+                # Build set of uncorrelated tickers to exclude
+                uncorrelated_tickers = set()
+                if uncorrelated_config:
+                    assets_list = uncorrelated_config.get('assets', [])
+                    if not assets_list and 'asset' in uncorrelated_config:
+                        uncorrelated_tickers.add(uncorrelated_config['asset'])
+                    else:
+                        uncorrelated_tickers = {a['ticker'] for a in assets_list}
                 
                 # Get historical universe if enabled
                 historical_universe = None
@@ -1105,11 +1123,11 @@ class PortfolioEngine:
                     except Exception as e:
                         print(f"   [WARN] Historical universe lookup failed: {e}")
                 
-                # Collect all rows for this date (excluding uncorrelated asset)
+                # Collect all rows for this date (excluding uncorrelated assets)
                 date_rows = {}
                 for ticker, df in self.data.items():
-                    # Skip uncorrelated asset - it's not a stock
-                    if ticker == uncorrelated_asset_ticker:
+                    # Skip uncorrelated assets - they are not stocks
+                    if ticker in uncorrelated_tickers:
                         continue
                     # Skip if not in historical universe (survivorship bias fix)
                     if historical_universe is not None and ticker not in historical_universe:
