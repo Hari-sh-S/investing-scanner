@@ -922,7 +922,7 @@ with main_tabs[0]:
                         # Check specific regime filter types
                         is_equity = regime_config and regime_config.get('type') == 'EQUITY'
                         is_equity_ma = regime_config and regime_config.get('type') == 'EQUITY_MA'
-                        is_other_regime = regime_config and regime_config.get('type') in ['EMA', 'MACD', 'SUPERTREND']
+                        is_other_regime = regime_config and regime_config.get('type') in ['EMA', 'MACD', 'SUPERTREND', 'DONCHIAN', 'SWING_ATR', 'BREADTH']
                         
                         # Equity Regime Testing tab - only for EQUITY filter
                         if is_equity and equity_analysis:
