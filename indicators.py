@@ -219,6 +219,70 @@ class IndicatorLibrary:
         return df
     
     @staticmethod
+    def add_donchian_channels(df, exit_period=55, recovery_period=20):
+        """Calculate Donchian channels for regime filter.
+        
+        Turtle Trading rules:
+        - Exit (trigger): Close breaks below N-period low (default 55)
+        - Recovery: Close breaks above M-period high (default 20)
+        
+        Asymmetric periods reduce whipsaw during choppy markets.
+        """
+        if isinstance(df, pd.Series):
+            raise ValueError("Input must be a DataFrame, not a Series")
+        
+        close = df['Close'].squeeze() if isinstance(df['Close'], pd.DataFrame) else df['Close']
+        high = df['High'].squeeze() if isinstance(df['High'], pd.DataFrame) else df['High']
+        low = df['Low'].squeeze() if isinstance(df['Low'], pd.DataFrame) else df['Low']
+        
+        # Donchian Low (for exit trigger) - uses low prices
+        df[f'Donchian_Low_{exit_period}'] = low.rolling(exit_period).min()
+        
+        # Donchian High (for recovery) - uses high prices
+        df[f'Donchian_High_{recovery_period}'] = high.rolling(recovery_period).max()
+        
+        # Store current close for comparison
+        df['Donchian_Close'] = close
+        
+        return df
+    
+    @staticmethod
+    def add_swing_atr(df, swing_period=20, atr_period=14):
+        """Calculate Swing pivot levels with ATR buffer.
+        
+        Exit signal: Close < Swing_Low - (buffer × ATR)
+        Recovery signal: Close > Swing_High + (buffer × ATR)
+        
+        The ATR buffer helps filter out noise and false breakouts.
+        """
+        if isinstance(df, pd.Series):
+            raise ValueError("Input must be a DataFrame, not a Series")
+        
+        close = df['Close'].squeeze() if isinstance(df['Close'], pd.DataFrame) else df['Close']
+        high = df['High'].squeeze() if isinstance(df['High'], pd.DataFrame) else df['High']
+        low = df['Low'].squeeze() if isinstance(df['Low'], pd.DataFrame) else df['Low']
+        
+        # Swing Low (lowest low over N periods)
+        df[f'Swing_Low_{swing_period}'] = low.rolling(swing_period).min()
+        
+        # Swing High (highest high over N periods)
+        df[f'Swing_High_{swing_period}'] = high.rolling(swing_period).max()
+        
+        # ATR calculation (using EMA for smoothness)
+        if f'ATR_{atr_period}' not in df.columns:
+            tr = np.maximum.reduce([
+                (high - low).values,
+                np.abs((high - close.shift(1)).fillna(0).values),
+                np.abs((low - close.shift(1)).fillna(0).values)
+            ])
+            df[f'ATR_{atr_period}'] = pd.Series(tr, index=df.index).ewm(span=atr_period, adjust=False).mean()
+        
+        # Store current close for comparison
+        df['Swing_Close'] = close
+        
+        return df
+    
+    @staticmethod
     def _add_supertrend_basic(df, period, multiplier, suffix=""):
         """Simplified supertrend for regime filter."""
         high = df['High'].squeeze() if isinstance(df['High'], pd.DataFrame) else df['High']

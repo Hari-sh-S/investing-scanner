@@ -715,7 +715,188 @@ class PortfolioEngine:
             if triggered:
                 return True, regime_config['action'], 0.0
         
+        elif regime_type == 'DONCHIAN':
+            # Donchian Channel regime filter (Turtle Trading rules)
+            # Stateful: once triggered, stays triggered until recovery
+            exit_period = regime_config.get('exit_period', 55)
+            recovery_period = regime_config.get('recovery_period', 20)
+            
+            low_col = f'Donchian_Low_{exit_period}'
+            high_col = f'Donchian_High_{recovery_period}'
+            
+            close_price = get_scalar(row.get('Close', 0))
+            donchian_low = get_scalar(row.get(low_col, 0))
+            donchian_high = get_scalar(row.get(high_col, 0))
+            
+            # Check if currently in triggered state (stored in regime_config)
+            is_donchian_triggered = regime_config.get('_donchian_active', False)
+            
+            if is_donchian_triggered:
+                # Check for recovery: close above donchian high
+                if close_price > donchian_high and donchian_high > 0:
+                    regime_config['_donchian_active'] = False
+                    print(f"🟢 DONCHIAN RECOVERED [{date}]: Close={close_price:.2f} > {high_col}={donchian_high:.2f}")
+                    return False, 'none', 0.0
+                else:
+                    print(f"⏳ DONCHIAN STILL ACTIVE [{date}]: Close={close_price:.2f}, Waiting for > {donchian_high:.2f}")
+                    return True, regime_config['action'], 0.0
+            else:
+                # Check for trigger: close below donchian low
+                if close_price < donchian_low and donchian_low > 0:
+                    regime_config['_donchian_active'] = True
+                    print(f"🔴 DONCHIAN TRIGGERED [{date}]: Close={close_price:.2f} < {low_col}={donchian_low:.2f}")
+                    return True, regime_config['action'], 0.0
+        
+        elif regime_type == 'SWING_ATR':
+            # Swing pivot with ATR buffer
+            swing_period = regime_config.get('swing_period', 20)
+            atr_buffer = regime_config.get('atr_buffer', 1.5)
+            
+            low_col = f'Swing_Low_{swing_period}'
+            high_col = f'Swing_High_{swing_period}'
+            
+            close_price = get_scalar(row.get('Close', 0))
+            swing_low = get_scalar(row.get(low_col, 0))
+            swing_high = get_scalar(row.get(high_col, 0))
+            atr = get_scalar(row.get('ATR_14', 0))
+            
+            # Buffered levels
+            exit_level = swing_low - (atr_buffer * atr)
+            recovery_level = swing_high + (atr_buffer * atr)
+            
+            # Check if currently in triggered state
+            is_swing_triggered = regime_config.get('_swing_active', False)
+            
+            if is_swing_triggered:
+                # Check for recovery
+                if close_price > recovery_level and recovery_level > 0:
+                    regime_config['_swing_active'] = False
+                    print(f"🟢 SWING_ATR RECOVERED [{date}]: Close={close_price:.2f} > Recovery={recovery_level:.2f}")
+                    return False, 'none', 0.0
+                else:
+                    print(f"⏳ SWING_ATR STILL ACTIVE [{date}]: Close={close_price:.2f}, Waiting for > {recovery_level:.2f}")
+                    return True, regime_config['action'], 0.0
+            else:
+                # Check for trigger
+                if close_price < exit_level and exit_level > 0:
+                    regime_config['_swing_active'] = True
+                    print(f"🔴 SWING_ATR TRIGGERED [{date}]: Close={close_price:.2f} < Exit={exit_level:.2f} (Swing={swing_low:.2f} - {atr_buffer}×ATR={atr:.2f})")
+                    return True, regime_config['action'], 0.0
+        
+        elif regime_type == 'BREADTH':
+            # Market breadth regime filter
+            # Check percentage of constituent stocks above 200 SMA
+            breadth_pct = self._calculate_market_breadth(date, regime_config)
+            threshold = regime_config.get('breadth_threshold', 60)
+            hysteresis = regime_config.get('breadth_hysteresis', 5)
+            
+            is_breadth_triggered = regime_config.get('_breadth_active', False)
+            
+            if is_breadth_triggered:
+                # Check for recovery (with hysteresis to avoid whipsaw)
+                recovery_threshold = threshold + hysteresis
+                if breadth_pct >= recovery_threshold:
+                    regime_config['_breadth_active'] = False
+                    print(f"🟢 BREADTH RECOVERED [{date}]: {breadth_pct:.1f}% >= {recovery_threshold}%")
+                    return False, 'none', 0.0
+                else:
+                    print(f"⏳ BREADTH STILL ACTIVE [{date}]: {breadth_pct:.1f}% < {recovery_threshold}% (waiting for recovery)")
+                    return True, regime_config['action'], 0.0
+            else:
+                # Check for trigger
+                if breadth_pct < threshold:
+                    regime_config['_breadth_active'] = True
+                    print(f"🔴 BREADTH TRIGGERED [{date}]: {breadth_pct:.1f}% < {threshold}%")
+                    return True, regime_config['action'], 0.0
+                else:
+                    print(f"✅ BREADTH OK [{date}]: {breadth_pct:.1f}% >= {threshold}%")
+        
         return False, 'none', 0.0
+    
+    def _calculate_market_breadth(self, date, regime_config):
+        """Calculate percentage of constituent stocks above 200 SMA.
+        
+        Loads constituent data from historical_constituents store and
+        checks each stock's position relative to its 200 SMA.
+        
+        Returns: float (0-100) representing percentage above 200 SMA
+        """
+        try:
+            # Get the breadth index (which index's constituents to use)
+            breadth_index = regime_config.get('breadth_index', 'NIFTY50')
+            
+            # Load constituent data for the given date
+            from historical_constituents.store import load_all_snapshots, get_available_indices
+            
+            # Check if we have cached constituents for this index
+            if not hasattr(self, '_breadth_constituents_cache'):
+                self._breadth_constituents_cache = {}
+            
+            if breadth_index not in self._breadth_constituents_cache:
+                # Load all snapshots for this index
+                available = get_available_indices()
+                index_key = breadth_index.lower().replace(' ', '')
+                
+                if index_key.upper() in [i.upper() for i in available]:
+                    snapshots = load_all_snapshots(index_key)
+                    self._breadth_constituents_cache[breadth_index] = snapshots
+                else:
+                    print(f"   [BREADTH] No constituent data for {breadth_index}")
+                    return 100.0  # Default to not triggered if no data
+            
+            snapshots = self._breadth_constituents_cache.get(breadth_index, [])
+            if not snapshots:
+                return 100.0
+            
+            # Find the appropriate snapshot for this date (most recent before date)
+            date_str = date.strftime('%Y-%m-%d') if hasattr(date, 'strftime') else str(date)
+            target_quarter = None
+            
+            for snapshot in reversed(snapshots):
+                if snapshot.effective_date <= date_str:
+                    target_quarter = snapshot
+                    break
+            
+            if target_quarter is None and snapshots:
+                target_quarter = snapshots[0]  # Use earliest if date is before all snapshots
+            
+            if target_quarter is None:
+                return 100.0
+            
+            constituents = target_quarter.symbols
+            
+            # Count stocks above 200 SMA
+            above_200_count = 0
+            total_valid = 0
+            
+            for ticker in constituents:
+                if ticker in self.data:
+                    df = self.data[ticker]
+                    if date in df.index:
+                        row = df.loc[date]
+                        close = row.get('Close', 0)
+                        sma_200 = row.get('SMA_200', 0)
+                        
+                        # Extract scalar if needed
+                        if hasattr(close, 'iloc'):
+                            close = float(close.iloc[0])
+                        if hasattr(sma_200, 'iloc'):
+                            sma_200 = float(sma_200.iloc[0])
+                        
+                        if sma_200 > 0:  # Valid SMA exists
+                            total_valid += 1
+                            if close > sma_200:
+                                above_200_count += 1
+            
+            if total_valid == 0:
+                return 100.0  # Default to not triggered if no valid data
+            
+            breadth_pct = (above_200_count / total_valid) * 100
+            return breadth_pct
+            
+        except Exception as e:
+            print(f"   [BREADTH] Error calculating breadth: {e}")
+            return 100.0  # Default to not triggered on error
 
     def run_rebalance_strategy(self, scoring_formula, num_stocks, exit_rank, 
                               rebal_config, regime_config=None, uncorrelated_config=None, 
@@ -786,6 +967,20 @@ class PortfolioEngine:
                 if not regime_data.empty:
                     print(f"Downloaded {len(regime_data)} days of regime index data (with 400-day pre-buffer for EMA)")
                     regime_data = IndicatorLibrary.add_regime_filters(regime_data)
+                    
+                    # Add Donchian channels if needed
+                    if regime_config.get('type') == 'DONCHIAN':
+                        exit_period = regime_config.get('exit_period', 55)
+                        recovery_period = regime_config.get('recovery_period', 20)
+                        regime_data = IndicatorLibrary.add_donchian_channels(regime_data, exit_period, recovery_period)
+                        print(f"Calculated Donchian channels ({exit_period}/{recovery_period})")
+                    
+                    # Add Swing + ATR if needed
+                    if regime_config.get('type') == 'SWING_ATR':
+                        swing_period = regime_config.get('swing_period', 20)
+                        regime_data = IndicatorLibrary.add_swing_atr(regime_data, swing_period)
+                        print(f"Calculated Swing+ATR (period={swing_period})")
+                    
                     self.regime_index_data = regime_data
                     # Debug: show first few EMA values
                     if 'EMA_200' in regime_data.columns:

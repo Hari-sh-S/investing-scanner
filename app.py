@@ -338,18 +338,24 @@ with main_tabs[0]:
             
             regime_config = None
             if use_regime_filter:
-                regime_type_options = ["EMA", "MACD", "SUPERTREND", "EQUITY", "EQUITY_MA"]
+                regime_type_options = ["EMA", "MACD", "SUPERTREND", "EQUITY", "EQUITY_MA", "DONCHIAN", "SWING_ATR", "BREADTH"]
                 saved_regime_type = saved_regime.get('type', 'EMA')
                 regime_type_idx = regime_type_options.index(saved_regime_type) if saved_regime_type in regime_type_options else 0
                 
                 regime_type = st.selectbox("Regime Filter Type", 
                                           regime_type_options,
                                           index=regime_type_idx,
-                                          help="EQUITY_MA: Uses moving average of your equity curve")
+                                          help="DONCHIAN: Turtle Trading rules (slow, robust) | SWING_ATR: Pivot with ATR buffer | BREADTH: % stocks above 200 SMA")
                 
                 # Initialize defaults
                 recovery_dd = None
                 ma_period = None
+                exit_period = None
+                recovery_period = None
+                swing_period = None
+                atr_buffer = None
+                breadth_threshold = None
+                breadth_index = None
                 
                 if regime_type == "EMA":
                     ema_options = [34, 68, 100, 150, 200]
@@ -380,7 +386,7 @@ with main_tabs[0]:
                         recovery_dd = st.number_input("Recovery DD %", 0, 49, saved_recovery,
                                                       help="Re-enter when drawdown below this %")
                     regime_value = realized_sl
-                else:  # EQUITY_MA
+                elif regime_type == "EQUITY_MA":
                     ma_options = [20, 30, 50, 100, 200]
                     saved_ma = saved_regime.get('ma_period', 50) if saved_regime.get('type') == 'EQUITY_MA' else 50
                     ma_idx = ma_options.index(saved_ma) if saved_ma in ma_options else 2
@@ -389,6 +395,56 @@ with main_tabs[0]:
                                             index=ma_idx,
                                             help="Reduce exposure when equity falls below this MA")
                     regime_value = ma_period
+                elif regime_type == "DONCHIAN":
+                    st.caption("📈 Turtle Trading: Exit on N-day low, Recovery on M-day high")
+                    don_col1, don_col2 = st.columns(2)
+                    with don_col1:
+                        exit_options = [40, 50, 55, 60]
+                        saved_exit = saved_regime.get('exit_period', 55) if saved_regime.get('type') == 'DONCHIAN' else 55
+                        exit_idx = exit_options.index(saved_exit) if saved_exit in exit_options else 2
+                        exit_period = st.selectbox("Exit Period (days)", exit_options, index=exit_idx,
+                                                   help="Trigger when price breaks N-day low")
+                    with don_col2:
+                        recov_options = [10, 15, 20, 25]
+                        saved_recov = saved_regime.get('recovery_period', 20) if saved_regime.get('type') == 'DONCHIAN' else 20
+                        recov_idx = recov_options.index(saved_recov) if saved_recov in recov_options else 2
+                        recovery_period = st.selectbox("Recovery Period (days)", recov_options, index=recov_idx,
+                                                       help="Recover when price breaks M-day high")
+                    regime_value = exit_period
+                elif regime_type == "SWING_ATR":
+                    st.caption("📊 Swing pivot with ATR buffer to filter noise")
+                    swing_col1, swing_col2 = st.columns(2)
+                    with swing_col1:
+                        saved_swing = saved_regime.get('swing_period', 20) if saved_regime.get('type') == 'SWING_ATR' else 20
+                        swing_period = st.number_input("Swing Lookback", 10, 50, saved_swing,
+                                                       help="Period for swing high/low detection")
+                    with swing_col2:
+                        saved_buffer = saved_regime.get('atr_buffer', 1.5) if saved_regime.get('type') == 'SWING_ATR' else 1.5
+                        atr_buffer = st.number_input("ATR Buffer", 0.5, 3.0, saved_buffer, step=0.5,
+                                                     help="ATR multiplier for exit/recovery buffer")
+                    regime_value = swing_period
+                elif regime_type == "BREADTH":
+                    st.caption("📉 Market health: % of stocks above 200 SMA")
+                    saved_threshold = saved_regime.get('breadth_threshold', 60) if saved_regime.get('type') == 'BREADTH' else 60
+                    breadth_threshold = st.number_input("Breadth Threshold %", 40, 80, saved_threshold,
+                                                        help="Trigger when fewer than X% of stocks above 200 SMA")
+                    # Only show indexes with constituent data
+                    try:
+                        from historical_constituents.store import get_available_indices
+                        available_indices = get_available_indices()
+                        breadth_index_options = [idx.upper().replace('NIFTY', 'NIFTY ') for idx in available_indices]
+                    except:
+                        breadth_index_options = ["NIFTY 50", "NIFTY 100"]
+                    
+                    saved_breadth_idx = saved_regime.get('breadth_index', 'NIFTY50') if saved_regime.get('type') == 'BREADTH' else 'NIFTY50'
+                    breadth_idx = 0
+                    for i, opt in enumerate(breadth_index_options):
+                        if saved_breadth_idx.upper().replace(' ', '') in opt.upper().replace(' ', ''):
+                            breadth_idx = i
+                            break
+                    breadth_index = st.selectbox("Breadth Index", breadth_index_options, index=breadth_idx,
+                                                 help="Index whose constituents to use for breadth calculation")
+                    regime_value = breadth_threshold
                 
                 action_options = ["Go Cash", "Half Portfolio"]
                 saved_action = saved_regime.get('action', 'Go Cash')
@@ -398,7 +454,8 @@ with main_tabs[0]:
                                             index=action_idx,
                                             help="Action when regime filter triggers")
                 
-                if regime_type not in ["EQUITY", "EQUITY_MA"]:
+                # Show index selector for regime types that use index data
+                if regime_type not in ["EQUITY", "EQUITY_MA", "BREADTH"]:
                     index_options = ["Stock"] + sorted(get_all_universe_names())
                     saved_index = saved_regime.get('index', 'NIFTY 50')
                     index_idx = index_options.index(saved_index) if saved_index in index_options else 0
@@ -412,7 +469,13 @@ with main_tabs[0]:
                     'action': regime_action,
                     'index': regime_index,
                     'recovery_dd': recovery_dd,
-                    'ma_period': ma_period if regime_type == "EQUITY_MA" else None
+                    'ma_period': ma_period if regime_type == "EQUITY_MA" else None,
+                    'exit_period': exit_period if regime_type == "DONCHIAN" else None,
+                    'recovery_period': recovery_period if regime_type == "DONCHIAN" else None,
+                    'swing_period': swing_period if regime_type == "SWING_ATR" else None,
+                    'atr_buffer': atr_buffer if regime_type == "SWING_ATR" else None,
+                    'breadth_threshold': breadth_threshold if regime_type == "BREADTH" else None,
+                    'breadth_index': breadth_index.replace(' ', '') if regime_type == "BREADTH" and breadth_index else None
                 }
                 
                 # Uncorrelated Asset
