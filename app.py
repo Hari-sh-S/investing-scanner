@@ -463,6 +463,18 @@ with main_tabs[0]:
                 else:
                     regime_index = None
                 
+                # Exit check frequency option (not applicable for EQUITY which always checks daily)
+                if regime_type not in ["EQUITY"]:
+                    exit_check_options = ["Intraday (Daily Check)", "Rebalance Day Only"]
+                    saved_exit_check = saved_regime.get('exit_check', 'Intraday (Daily Check)')
+                    exit_check_idx = exit_check_options.index(saved_exit_check) if saved_exit_check in exit_check_options else 0
+                    exit_check = st.selectbox("Exit Check Frequency",
+                                             exit_check_options,
+                                             index=exit_check_idx,
+                                             help="Intraday: Exit immediately when regime triggers | Rebalance Day: Only check on rebalance days")
+                else:
+                    exit_check = "Intraday (Daily Check)"  # EQUITY always uses daily check
+                
                 regime_config = {
                     'type': regime_type,
                     'value': regime_value,
@@ -475,7 +487,8 @@ with main_tabs[0]:
                     'swing_period': swing_period if regime_type == "SWING_ATR" else None,
                     'atr_buffer': atr_buffer if regime_type == "SWING_ATR" else None,
                     'breadth_threshold': breadth_threshold if regime_type == "BREADTH" else None,
-                    'breadth_index': breadth_index.replace(' ', '') if regime_type == "BREADTH" and breadth_index else None
+                    'breadth_index': breadth_index.replace(' ', '') if regime_type == "BREADTH" and breadth_index else None,
+                    'exit_check': exit_check
                 }
                 
                 # Uncorrelated Asset

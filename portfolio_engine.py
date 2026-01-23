@@ -1107,6 +1107,47 @@ class PortfolioEngine:
                     holdings = {}
                     regime_active = True
             
+            # INTRADAY REGIME CHECK: For non-EQUITY types when exit_check is 'Intraday (Daily Check)'
+            # This checks the regime filter daily (not just on rebalance) and exits immediately when triggered
+            is_intraday_exit = regime_config and regime_config.get('exit_check', 'Intraday (Daily Check)') == 'Intraday (Daily Check)'
+            is_non_equity_regime = regime_config and regime_config.get('type') not in ['EQUITY', 'EQUITY_MA']
+            
+            if is_intraday_exit and is_non_equity_regime and not regime_active and holdings:
+                # Check regime filter daily (not just on rebalance days)
+                intraday_triggered, intraday_action, _ = self._check_regime_filter(date, regime_config, current_equity, peak_equity)
+                
+                if intraday_triggered:
+                    # TRIGGER: Regime filter triggered - SELL ALL immediately
+                    regime_type = regime_config.get('type', 'UNKNOWN')
+                    print(f"🔴 {regime_type} REGIME TRIGGERED (INTRADAY) [{date.date()}]: Selling all positions")
+                    
+                    regime_active = True
+                    self.regime_trigger_events.append({
+                        'date': date,
+                        'type': 'trigger',
+                        'drawdown': 0,
+                        'peak': peak_equity,
+                        'current': current_equity
+                    })
+                    
+                    # Sell all holdings immediately
+                    for ticker, shares in list(holdings.items()):
+                        if ticker in self.data and date in self.data[ticker].index:
+                            sell_price = self._get_scalar(self.data[ticker].loc[date, 'Close'])
+                            proceeds = shares * sell_price
+                            cash += proceeds
+                            
+                            self.trades.append({
+                                'Date': date,
+                                'Ticker': ticker,
+                                'Action': 'SELL',
+                                'Shares': shares,
+                                'Price': sell_price,
+                                'Value': proceeds,
+                                'Reason': f'{regime_type}_REGIME_TRIGGER'
+                            })
+                    holdings = {}
+            
             if is_rebalance:
                 # Sell all current holdings (regular rebalance sell)
                 for ticker, shares in list(holdings.items()):
