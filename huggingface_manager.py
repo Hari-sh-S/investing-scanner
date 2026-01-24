@@ -511,6 +511,115 @@ class HuggingFaceManager:
         except Exception as e:
             print(f"Error listing HF YFinance files: {e}")
             return []
+    
+    def batch_sync_yfinance_symbols(
+        self,
+        symbol_data_dict: dict[str, pd.DataFrame],
+        progress_callback: Optional[Callable[[int, int, str, str], None]] = None
+    ) -> int:
+        """Batch upload multiple YFinance symbols in ONE commit.
+        
+        This avoids rate limits by collecting all data locally first,
+        then uploading the entire folder in a single commit.
+        
+        Args:
+            symbol_data_dict: Dict mapping symbol -> DataFrame
+            progress_callback: Optional callback(current, total, symbol, status)
+            
+        Returns:
+            Number of symbols successfully uploaded
+        """
+        from huggingface_hub import upload_folder
+        import tempfile
+        import shutil
+        
+        if not symbol_data_dict:
+            return 0
+        
+        # Create temp directory for batch collection
+        temp_dir = Path(tempfile.mkdtemp(prefix="yfinance_batch_"))
+        yfinance_dir = temp_dir / "yfinance"
+        yfinance_dir.mkdir(exist_ok=True)
+        
+        success_count = 0
+        total = len(symbol_data_dict)
+        
+        try:
+            # Phase 1: Save all data to local temp folder
+            if progress_callback:
+                progress_callback(0, total, "Starting", "Preparing batch upload...")
+            
+            for i, (symbol, df) in enumerate(symbol_data_dict.items()):
+                try:
+                    if df is None or df.empty:
+                        continue
+                    
+                    # Ensure Date column exists
+                    if 'Date' not in df.columns and df.index.name == 'Date':
+                        df = df.reset_index()
+                    
+                    # Clean symbol name
+                    clean_symbol = symbol.replace('.NS', '').replace('.BO', '')
+                    
+                    # Try to merge with existing HF data
+                    try:
+                        existing = self.download_yfinance_symbol(symbol)
+                        if existing is not None and not existing.empty:
+                            combined = pd.concat([existing, df], ignore_index=True)
+                            combined = combined.drop_duplicates(subset=['Date'], keep='last')
+                            combined = combined.sort_values('Date').reset_index(drop=True)
+                        else:
+                            combined = df.sort_values('Date').reset_index(drop=True) if 'Date' in df.columns else df
+                    except:
+                        combined = df.sort_values('Date').reset_index(drop=True) if 'Date' in df.columns else df
+                    
+                    # Save to local temp folder
+                    file_path = yfinance_dir / f"{clean_symbol}.parquet"
+                    combined.to_parquet(file_path, index=False)
+                    success_count += 1
+                    
+                    if progress_callback:
+                        progress_callback(i + 1, total, symbol, f"Prepared ({len(combined)} days)")
+                        
+                except Exception as e:
+                    print(f"Error preparing {symbol}: {e}")
+                    if progress_callback:
+                        progress_callback(i + 1, total, symbol, f"Error: {str(e)[:30]}")
+            
+            # Phase 2: Upload entire folder in ONE commit
+            if success_count > 0:
+                if progress_callback:
+                    progress_callback(total, total, "Uploading", 
+                                    f"Uploading {success_count} files to HuggingFace...")
+                
+                try:
+                    upload_folder(
+                        folder_path=str(temp_dir),
+                        repo_id=self.repo_id,
+                        repo_type="dataset",
+                        token=self.token,
+                        commit_message=f"YFinance batch upload: {success_count} symbols"
+                    )
+                    
+                    if progress_callback:
+                        progress_callback(total, total, "Complete", 
+                                        f"Uploaded {success_count} symbols!")
+                    print(f"Successfully uploaded {success_count} YFinance symbols to HuggingFace")
+                    
+                except Exception as e:
+                    print(f"Error uploading to HuggingFace: {e}")
+                    if progress_callback:
+                        progress_callback(total, total, "Upload Error", str(e)[:50])
+                    return 0
+            
+        finally:
+            # Cleanup temp directory
+            try:
+                shutil.rmtree(temp_dir)
+            except:
+                pass
+        
+        return success_count
 
 
 

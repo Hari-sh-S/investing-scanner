@@ -453,6 +453,8 @@ class PortfolioEngine:
                 tickers_needing_yfinance.append((ticker, None, None))  # None means full download
         
         # PHASE 2: Download missing data from YFinance
+        yfinance_data_to_sync = {}  # Collect data for batch upload
+        
         if tickers_needing_yfinance:
             print(f"Downloading {len(tickers_needing_yfinance)} stocks from YFinance...")
             
@@ -464,7 +466,7 @@ class PortfolioEngine:
             if full_downloads:
                 self.download_and_cache_universe(full_downloads, progress_callback)
                 
-                # Retry loading and sync to HF
+                # Retry loading and collect for HF sync
                 for ticker in full_downloads:
                     if self.cache:
                         cached_data = self.cache.get(ticker)
@@ -472,13 +474,9 @@ class PortfolioEngine:
                             df_processed = process_dataframe(cached_data.copy(), ticker)
                             if df_processed is not None:
                                 self.data[ticker] = df_processed
-                                
-                                # Sync to HuggingFace
+                                # Collect for batch upload
                                 if hf_available:
-                                    try:
-                                        hf.sync_yfinance_symbol(ticker, cached_data)
-                                    except Exception as e:
-                                        print(f"HF sync error for {ticker}: {e}")
+                                    yfinance_data_to_sync[ticker] = cached_data.copy()
             
             # Incremental downloads
             for ticker, last_date, end_date in incremental_downloads:
@@ -497,16 +495,19 @@ class PortfolioEngine:
                     if not new_data.empty:
                         new_data = new_data.reset_index()
                         if hf_available:
-                            hf.sync_yfinance_symbol(ticker, new_data)
-                            
-                            # Reload from HF to get merged data
-                            hf_data = hf.download_yfinance_symbol(ticker)
-                            if hf_data is not None:
-                                df_processed = process_dataframe(hf_data.copy(), ticker)
-                                if df_processed is not None:
-                                    self.data[ticker] = df_processed
+                            yfinance_data_to_sync[ticker] = new_data.copy()
                 except Exception as e:
                     print(f"Incremental update error for {ticker}: {e}")
+            
+            # PHASE 3: Batch upload all collected data to HuggingFace
+            if hf_available and yfinance_data_to_sync:
+                print(f"Uploading {len(yfinance_data_to_sync)} symbols to HuggingFace...")
+                try:
+                    uploaded = hf.batch_sync_yfinance_symbols(yfinance_data_to_sync)
+                    print(f"Batch upload complete: {uploaded} symbols")
+                except Exception as e:
+                    print(f"Batch upload error: {e}")
+        
         
         print(f"Successfully loaded {len(self.data)} stocks")
         return len(self.data) > 0
