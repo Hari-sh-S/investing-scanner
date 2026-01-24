@@ -335,10 +335,28 @@ class PortfolioEngine:
         return len(self.data) > 0
     
     def _fetch_from_yahoo(self, progress_callback=None):
-        """Fetch data from Yahoo Finance with local cache."""
+        """Fetch data from Yahoo Finance with HuggingFace as primary storage.
+        
+        Priority:
+        1. Load from HuggingFace (yfinance folder)
+        2. If missing dates needed, download from YFinance
+        3. Sync new data back to HuggingFace
+        4. Fall back to local cache if HF unavailable
+        """
         print(f"Loading data for {len(self.universe)} stocks...")
-        tickers_to_download = []
-
+        
+        # Check if HuggingFace is available
+        hf = None
+        hf_available = False
+        try:
+            from huggingface_manager import HuggingFaceManager, is_hf_configured
+            if is_hf_configured():
+                hf = HuggingFaceManager()
+                hf_available = True
+                print("✓ HuggingFace connected - using as primary data source")
+        except Exception as e:
+            print(f"HuggingFace not available: {e} - using local cache")
+        
         def clean_dataframe(df, ticker_name="unknown"):
             """Remove duplicates, detect anomalies, and ensure clean data."""
             try:
@@ -351,7 +369,6 @@ class PortfolioEngine:
                 df = df.sort_index()
                 
                 # DATA QUALITY: Detect extreme single-day price changes (>50%)
-                # Just warn, don't fix
                 if 'Close' in df.columns and len(df) > 3:
                     close = df['Close']
                     pct_change = close.pct_change().abs()
@@ -364,86 +381,133 @@ class PortfolioEngine:
                 return df
             except Exception:
                 return df  # Return unchanged if cleaning fails
-
-        # First, try to load from cache
+        
+        def process_dataframe(df, ticker):
+            """Process and filter dataframe for use."""
+            if df is None or df.empty:
+                return None
+                
+            # Fix index - Date should be the index
+            if 'Date' in df.columns:
+                df['Date'] = pd.to_datetime(df['Date'])
+                df = df.set_index('Date')
+            
+            # Ensure index is datetime
+            if not isinstance(df.index, pd.DatetimeIndex):
+                df.index = pd.to_datetime(df.index)
+            
+            # Clean data
+            df = clean_dataframe(df, ticker)
+            
+            # Include 300 days BEFORE start_date for indicator lookback
+            extended_start = pd.Timestamp(self.start_date) - pd.Timedelta(days=300)
+            mask = (df.index >= extended_start) & (df.index <= pd.Timestamp(self.end_date))
+            df_filtered = df[mask].copy()
+            
+            # Flatten MultiIndex columns if present
+            if isinstance(df_filtered.columns, pd.MultiIndex):
+                df_filtered.columns = [col[0] if isinstance(col, tuple) else col for col in df_filtered.columns]
+            
+            return df_filtered if not df_filtered.empty and len(df_filtered) >= 100 else None
+        
+        tickers_needing_yfinance = []  # Tickers that need fresh YFinance download
+        
+        # PHASE 1: Try loading from HuggingFace first
         for i, ticker in enumerate(self.universe):
             if progress_callback:
-                progress_callback(i + 1, len(self.universe), ticker)
-
-            if self.cache:
+                progress_callback(i + 1, len(self.universe), f"Loading {ticker}")
+            
+            loaded = False
+            
+            # Try HuggingFace first
+            if hf_available:
+                try:
+                    hf_data = hf.download_yfinance_symbol(ticker)
+                    if hf_data is not None and not hf_data.empty:
+                        df_processed = process_dataframe(hf_data.copy(), ticker)
+                        if df_processed is not None:
+                            self.data[ticker] = df_processed
+                            loaded = True
+                            
+                            # Check if we need more recent data
+                            from datetime import date
+                            _, max_date = hf.get_yfinance_date_range(ticker)
+                            today = date.today()
+                            if max_date and (today - max_date).days > 1:
+                                # Need to fetch recent data
+                                tickers_needing_yfinance.append((ticker, max_date, today))
+                except Exception as e:
+                    print(f"HF load error for {ticker}: {e}")
+            
+            # Fall back to local cache if HF didn't work
+            if not loaded and self.cache:
                 cached_data = self.cache.get(ticker)
                 if cached_data is not None:
-                    try:
-                        # Fix index - Date should be the index
-                        if 'Date' in cached_data.columns:
-                            cached_data['Date'] = pd.to_datetime(cached_data['Date'])
-                            cached_data.set_index('Date', inplace=True)
-
-                        # Ensure index is datetime
-                        if not isinstance(cached_data.index, pd.DatetimeIndex):
-                            cached_data.index = pd.to_datetime(cached_data.index)
-
-                        # Clean data - remove duplicate indices and fix anomalies
-                        cached_data = clean_dataframe(cached_data, ticker)
-
-                        # Include 300 days BEFORE start_date for indicator lookback
-                        # 6-month performance needs ~130 days, 1-year needs ~260 days
-                        extended_start = pd.Timestamp(self.start_date) - pd.Timedelta(days=300)
-                        mask = (cached_data.index >= extended_start) & \
-                               (cached_data.index <= pd.Timestamp(self.end_date))
-                        df_filtered = cached_data[mask].copy()
-                        
-                        # Flatten MultiIndex columns if present
-                        if isinstance(df_filtered.columns, pd.MultiIndex):
-                            df_filtered.columns = [col[0] if isinstance(col, tuple) else col for col in df_filtered.columns]
-
-                        if not df_filtered.empty and len(df_filtered) >= 100:
-                            self.data[ticker] = df_filtered
-                            continue
-                    except Exception as e:
-                        print(f"Error loading {ticker}: {e}")
-
-            # If not in cache or insufficient data, mark for download
-            tickers_to_download.append(ticker)
-
-        # Download missing tickers (with indicators calculated automatically)
-        if tickers_to_download:
-            print(f"Downloading {len(tickers_to_download)} missing stocks...")
-            self.download_and_cache_universe(tickers_to_download, progress_callback)
-
-            # Retry loading after download
-            for ticker in tickers_to_download:
-                if self.cache:
-                    cached_data = self.cache.get(ticker)
-                    if cached_data is not None:
-                        try:
-                            # Fix index - Date should be the index
-                            if 'Date' in cached_data.columns:
-                                cached_data['Date'] = pd.to_datetime(cached_data['Date'])
-                                cached_data.set_index('Date', inplace=True)
-
-                            # Ensure index is datetime
-                            if not isinstance(cached_data.index, pd.DatetimeIndex):
-                                cached_data.index = pd.to_datetime(cached_data.index)
-
-                            # Clean data
-                            cached_data = clean_dataframe(cached_data, ticker)
-
-                            # Include 300 days BEFORE start_date for indicator lookback
-                            extended_start = pd.Timestamp(self.start_date) - pd.Timedelta(days=300)
-                            mask = (cached_data.index >= extended_start) & \
-                                   (cached_data.index <= pd.Timestamp(self.end_date))
-                            df_filtered = cached_data[mask].copy()
+                    df_processed = process_dataframe(cached_data.copy(), ticker)
+                    if df_processed is not None:
+                        self.data[ticker] = df_processed
+                        loaded = True
+            
+            # Mark for full YFinance download if nothing worked
+            if not loaded:
+                tickers_needing_yfinance.append((ticker, None, None))  # None means full download
+        
+        # PHASE 2: Download missing data from YFinance
+        if tickers_needing_yfinance:
+            print(f"Downloading {len(tickers_needing_yfinance)} stocks from YFinance...")
+            
+            # Group by download type
+            full_downloads = [t[0] for t in tickers_needing_yfinance if t[1] is None]
+            incremental_downloads = [(t[0], t[1], t[2]) for t in tickers_needing_yfinance if t[1] is not None]
+            
+            # Full downloads (batch)
+            if full_downloads:
+                self.download_and_cache_universe(full_downloads, progress_callback)
+                
+                # Retry loading and sync to HF
+                for ticker in full_downloads:
+                    if self.cache:
+                        cached_data = self.cache.get(ticker)
+                        if cached_data is not None:
+                            df_processed = process_dataframe(cached_data.copy(), ticker)
+                            if df_processed is not None:
+                                self.data[ticker] = df_processed
+                                
+                                # Sync to HuggingFace
+                                if hf_available:
+                                    try:
+                                        hf.sync_yfinance_symbol(ticker, cached_data)
+                                    except Exception as e:
+                                        print(f"HF sync error for {ticker}: {e}")
+            
+            # Incremental downloads
+            for ticker, last_date, end_date in incremental_downloads:
+                try:
+                    ticker_ns = ticker if ticker.endswith(('.NS', '.BO')) else f"{ticker}.NS"
+                    from datetime import timedelta
+                    start = last_date + timedelta(days=1)
+                    
+                    new_data = yf.download(
+                        ticker_ns,
+                        start=start.strftime('%Y-%m-%d'),
+                        end=end_date.strftime('%Y-%m-%d'),
+                        progress=False
+                    )
+                    
+                    if not new_data.empty:
+                        new_data = new_data.reset_index()
+                        if hf_available:
+                            hf.sync_yfinance_symbol(ticker, new_data)
                             
-                            # Flatten MultiIndex columns if present
-                            if isinstance(df_filtered.columns, pd.MultiIndex):
-                                df_filtered.columns = [col[0] if isinstance(col, tuple) else col for col in df_filtered.columns]
-
-                            if not df_filtered.empty:
-                                self.data[ticker] = df_filtered
-                        except Exception as e:
-                            print(f"Error loading {ticker} after download: {e}")
-
+                            # Reload from HF to get merged data
+                            hf_data = hf.download_yfinance_symbol(ticker)
+                            if hf_data is not None:
+                                df_processed = process_dataframe(hf_data.copy(), ticker)
+                                if df_processed is not None:
+                                    self.data[ticker] = df_processed
+                except Exception as e:
+                    print(f"Incremental update error for {ticker}: {e}")
+        
         print(f"Successfully loaded {len(self.data)} stocks")
         return len(self.data) > 0
     
