@@ -493,16 +493,23 @@ with main_tabs[0]:
                 
                 # Uncorrelated Asset
                 st.markdown("---")
-                use_uncorrelated = st.checkbox("Invest in Uncorrelated Asset", value=False,
+                # Get saved uncorrelated config
+                saved_uncorrelated = loaded_config.get('uncorrelated_config', {}) or {}
+                use_uncorrelated = st.checkbox("Invest in Uncorrelated Asset", 
+                                              value=loaded_config.get('use_uncorrelated', False),
                                               help="Allocate to uncorrelated assets when regime triggers")
                 
                 uncorrelated_config = None
                 if use_uncorrelated:
                     st.caption("Add assets to allocate when regime triggers (allocations should sum to 100%)")
                     
-                    # Initialize session state for assets list
+                    # Initialize session state for assets list from loaded config or default
                     if 'uncorrelated_assets' not in st.session_state:
-                        st.session_state.uncorrelated_assets = [{'ticker': 'GOLDBEES', 'pct': 100}]
+                        saved_assets = saved_uncorrelated.get('assets', [])
+                        if saved_assets:
+                            st.session_state.uncorrelated_assets = saved_assets.copy()
+                        else:
+                            st.session_state.uncorrelated_assets = [{'ticker': 'GOLDBEES', 'pct': 100}]
                     
                     available_assets = ["GOLDBEES", "JUNIORBEES", "NIFTYBEES", "SILVERBEES", "BANKBEES", "LIQUIDBEES"]
                     
@@ -670,6 +677,8 @@ with main_tabs[0]:
                                 'max_position_pct': max_position_pct,
                                 'use_regime_filter': use_regime_filter,
                                 'regime_config': regime_config,
+                                'use_uncorrelated': use_uncorrelated,
+                                'uncorrelated_config': uncorrelated_config,
                                 'formula': formula,
                                 'template': template
                             }
