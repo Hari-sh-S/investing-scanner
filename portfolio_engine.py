@@ -1650,6 +1650,11 @@ class PortfolioEngine:
         self.portfolio_df = pd.DataFrame(portfolio_history).set_index('Date')
         self.trades_df = pd.DataFrame(self.trades)
         
+        # Store final holdings for get_open_positions()
+        self.final_holdings = holdings.copy()  # {ticker: shares}
+        self.final_last_known_prices = last_known_prices.copy()  # {ticker: price}
+        self.final_cash = cash
+        
         # Store regime analysis data for ANY regime filter (for comparison)
         if has_regime_filter and theoretical_history:
             self.equity_regime_analysis = {
@@ -1670,6 +1675,55 @@ class PortfolioEngine:
             or None if no regime filter was used
         """
         return self.equity_regime_analysis
+    
+    def get_open_positions(self):
+        """Get current open positions with P&L information.
+        
+        Returns:
+            List of dicts with Stock, Shares, Buy Price, Current Price, 
+            Unrealized P&L, and Unrealized ROI %
+        """
+        if not hasattr(self, 'final_holdings') or not self.final_holdings:
+            return []
+        
+        positions = []
+        
+        # Get buy prices from trades
+        buy_prices = {}
+        if hasattr(self, 'trades') and self.trades:
+            for trade in self.trades:
+                if trade.get('Action') == 'BUY':
+                    ticker = trade.get('Stock')
+                    # Keep the most recent buy price for each ticker
+                    buy_prices[ticker] = trade.get('Price', 0)
+        
+        for ticker, shares in self.final_holdings.items():
+            if shares <= 0:
+                continue
+            
+            # Get current price
+            current_price = self.final_last_known_prices.get(ticker, 0)
+            
+            # Get buy price (from trades or fall back to current price)
+            buy_price = buy_prices.get(ticker, current_price)
+            
+            # Calculate P&L
+            unrealized_pnl = (current_price - buy_price) * shares
+            unrealized_roi = ((current_price - buy_price) / buy_price * 100) if buy_price > 0 else 0
+            
+            positions.append({
+                'Stock': ticker,
+                'Shares': shares,
+                'Buy Price': round(buy_price, 2),
+                'Current Price': round(current_price, 2),
+                'Unrealized P&L': round(unrealized_pnl, 2),
+                'Unrealized ROI %': round(unrealized_roi, 2)
+            })
+        
+        # Sort by unrealized ROI
+        positions.sort(key=lambda x: x['Unrealized ROI %'], reverse=True)
+        
+        return positions
     
     def get_metrics(self):
         """Calculate comprehensive performance metrics."""
