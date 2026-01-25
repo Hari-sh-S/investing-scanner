@@ -2454,14 +2454,11 @@ with main_tabs[2]:
                                                 'status': 'PAPER'
                                             })
                                     
-                                    # Build portfolio values
-                                    portfolio_values = []
-                                    if hasattr(engine, 'portfolio_df') and not engine.portfolio_df.empty:
-                                        for idx, row in engine.portfolio_df.iterrows():
-                                            portfolio_values.append({
-                                                'date': idx.strftime('%Y-%m-%d'),
-                                                'value': row['Portfolio Value']
-                                            })
+                                    # Start with execution date value only (not full backtest history)
+                                    portfolio_values = [{
+                                        'date': datetime.datetime.now().strftime('%Y-%m-%d'),
+                                        'value': exec_capital
+                                    }]
                                     
                                     # Save execution
                                     success = execution_storage.save_execution(
@@ -2507,14 +2504,11 @@ with main_tabs[2]:
                                             'error': order.get('message', '')
                                         })
                                     
-                                    # Build portfolio values
-                                    portfolio_values = []
-                                    if hasattr(engine, 'portfolio_df') and not engine.portfolio_df.empty:
-                                        for idx, row in engine.portfolio_df.iterrows():
-                                            portfolio_values.append({
-                                                'date': idx.strftime('%Y-%m-%d'),
-                                                'value': row['Portfolio Value']
-                                            })
+                                    # Start with execution date value only (not full backtest history)
+                                    portfolio_values = [{
+                                        'date': datetime.datetime.now().strftime('%Y-%m-%d'),
+                                        'value': exec_capital
+                                    }]
                                     
                                     # Save execution
                                     execution_storage.save_execution(
