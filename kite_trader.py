@@ -14,6 +14,209 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
+# ==================== TOKEN PERSISTENCE ====================
+
+def _get_hf_credentials():
+    """Get HF credentials from Streamlit secrets for token storage."""
+    try:
+        token = st.secrets.get("HF_TOKEN")
+        repo = st.secrets.get("HF_DATASET_REPO")
+        if token and repo:
+            return token, repo
+    except Exception:
+        pass
+    return None, None
+
+
+def save_kite_token_to_hf(access_token: str, user_id: str, user_name: str) -> bool:
+    """
+    Save Kite access token to HuggingFace for persistence across sessions.
+    
+    Args:
+        access_token: The Kite access token
+        user_id: The user's Kite user ID
+        user_name: The user's name
+        
+    Returns:
+        True if saved successfully
+    """
+    from datetime import datetime
+    import json
+    import tempfile
+    from pathlib import Path
+    
+    hf_token, repo = _get_hf_credentials()
+    if not hf_token or not repo:
+        logger.warning("HuggingFace not configured, token will not persist")
+        return False
+    
+    try:
+        from huggingface_hub import upload_file
+        
+        token_data = {
+            'access_token': access_token,
+            'user_id': user_id,
+            'user_name': user_name,
+            'saved_at': datetime.now().isoformat()
+        }
+        
+        # Save to temp file
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+            json.dump(token_data, f, indent=2)
+            tmp_path = f.name
+        
+        # Upload to HF
+        upload_file(
+            path_or_fileobj=tmp_path,
+            path_in_repo="kite_token.json",
+            repo_id=repo,
+            repo_type="dataset",
+            token=hf_token,
+            commit_message="Save Kite access token"
+        )
+        
+        # Cleanup
+        Path(tmp_path).unlink(missing_ok=True)
+        
+        logger.info(f"Kite token saved to HuggingFace for user: {user_id}")
+        return True
+        
+    except Exception as e:
+        logger.error(f"Error saving Kite token to HF: {e}")
+        return False
+
+
+def load_kite_token_from_hf() -> Optional[Dict]:
+    """
+    Load saved Kite token from HuggingFace.
+    
+    Returns:
+        Dict with token data or None if not found
+    """
+    import json
+    
+    hf_token, repo = _get_hf_credentials()
+    if not hf_token or not repo:
+        return None
+    
+    try:
+        from huggingface_hub import hf_hub_download
+        from huggingface_hub.utils import EntryNotFoundError
+        
+        file_path = hf_hub_download(
+            repo_id=repo,
+            filename="kite_token.json",
+            repo_type="dataset",
+            token=hf_token
+        )
+        
+        with open(file_path, 'r') as f:
+            token_data = json.load(f)
+        
+        logger.info(f"Kite token loaded from HuggingFace for user: {token_data.get('user_id', 'unknown')}")
+        return token_data
+        
+    except Exception as e:
+        # EntryNotFoundError is expected if no token saved yet
+        if "EntryNotFoundError" not in str(type(e)):
+            logger.debug(f"No saved Kite token found: {e}")
+        return None
+
+
+def validate_kite_token(access_token: str) -> bool:
+    """
+    Validate if a Kite access token is still valid by making an API call.
+    
+    Args:
+        access_token: The token to validate
+        
+    Returns:
+        True if token is valid, False otherwise
+    """
+    try:
+        from kiteconnect import KiteConnect
+        
+        api_key, _ = get_kite_credentials()
+        kite = KiteConnect(api_key=api_key)
+        kite.set_access_token(access_token)
+        
+        # Try to fetch profile - this will fail if token is invalid
+        profile = kite.profile()
+        logger.info(f"Kite token validated for user: {profile.get('user_id', 'unknown')}")
+        return True
+        
+    except Exception as e:
+        logger.info(f"Kite token validation failed: {e}")
+        return False
+
+
+def clear_kite_token_from_hf() -> bool:
+    """
+    Delete saved Kite token from HuggingFace.
+    
+    Returns:
+        True if deleted successfully
+    """
+    hf_token, repo = _get_hf_credentials()
+    if not hf_token or not repo:
+        return False
+    
+    try:
+        from huggingface_hub import HfApi
+        
+        api = HfApi(token=hf_token)
+        api.delete_file(
+            path_in_repo="kite_token.json",
+            repo_id=repo,
+            repo_type="dataset",
+            commit_message="Clear Kite access token"
+        )
+        
+        logger.info("Kite token cleared from HuggingFace")
+        return True
+        
+    except Exception as e:
+        logger.debug(f"Error clearing Kite token from HF: {e}")
+        return False
+
+
+def restore_kite_session() -> bool:
+    """
+    Attempt to restore Kite session from saved HuggingFace token.
+    Validates the token before restoring.
+    
+    Returns:
+        True if session restored successfully, False otherwise
+    """
+    # Skip if already authenticated
+    if st.session_state.get('kite_access_token'):
+        return True
+    
+    # Try to load saved token
+    token_data = load_kite_token_from_hf()
+    if not token_data:
+        return False
+    
+    access_token = token_data.get('access_token')
+    if not access_token:
+        return False
+    
+    # Validate the token
+    if validate_kite_token(access_token):
+        # Restore session state
+        st.session_state.kite_access_token = access_token
+        st.session_state.kite_user_id = token_data.get('user_id', '')
+        st.session_state.kite_user_name = token_data.get('user_name', '')
+        logger.info(f"Kite session restored for user: {st.session_state.kite_user_id}")
+        return True
+    else:
+        # Token is invalid/expired, clear it
+        clear_kite_token_from_hf()
+        return False
+
+# ==================== END TOKEN PERSISTENCE ====================
+
+
 def is_kite_configured() -> bool:
     """Check if Kite API credentials are configured in Streamlit secrets."""
     try:
@@ -71,13 +274,18 @@ def handle_kite_callback(request_token: str) -> bool:
         # Generate session with request token
         data = kite.generate_session(request_token, api_secret=api_secret)
         access_token = data["access_token"]
+        user_id = data.get("user_id", "")
+        user_name = data.get("user_name", "")
         
         # Store in session state
         st.session_state.kite_access_token = access_token
-        st.session_state.kite_user_id = data.get("user_id", "")
-        st.session_state.kite_user_name = data.get("user_name", "")
+        st.session_state.kite_user_id = user_id
+        st.session_state.kite_user_name = user_name
         
-        logger.info(f"Kite session generated for user: {st.session_state.kite_user_id}")
+        # Save token to HuggingFace for persistence
+        save_kite_token_to_hf(access_token, user_id, user_name)
+        
+        logger.info(f"Kite session generated for user: {user_id}")
         return True
         
     except Exception as e:

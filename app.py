@@ -161,6 +161,11 @@ st.markdown(f"### 📊 Investing Scanner <span style='font-size: 14px; color: #8
 
 # Handle Kite OAuth callback at app start (before any tabs)
 if kite_trader.is_kite_configured():
+    # First, try to restore session from saved HuggingFace token
+    if not st.session_state.get('kite_access_token'):
+        kite_trader.restore_kite_session()
+    
+    # Handle OAuth callback if present
     query_params = st.query_params
     if 'request_token' in query_params:
         request_token = query_params['request_token']
@@ -2209,6 +2214,9 @@ with main_tabs[2]:
         with auth_col2:
             if is_authenticated:
                 if st.button("🚪 Logout", key="kite_logout_main", use_container_width=True):
+                    # Clear from HuggingFace
+                    kite_trader.clear_kite_token_from_hf()
+                    # Clear session state
                     st.session_state.kite_access_token = None
                     st.session_state.kite_user_id = None
                     st.session_state.kite_user_name = None
