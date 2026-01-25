@@ -2363,16 +2363,8 @@ with main_tabs[2]:
                 # Display positions and execute buttons if backtest was run
                 if 'exec_engine' in st.session_state and st.session_state.get('exec_engine'):
                     engine = st.session_state['exec_engine']
-                    metrics = st.session_state['exec_metrics']
                     
                     st.markdown("---")
-                    
-                    # Show key metrics
-                    metric_cols = st.columns(4)
-                    metric_cols[0].metric("Final Value", f"₹{metrics['Final Value']:,.0f}")
-                    metric_cols[1].metric("CAGR", f"{metrics['CAGR %']:.2f}%")
-                    metric_cols[2].metric("Max Drawdown", f"{metrics['Max Drawdown %']:.2f}%")
-                    metric_cols[3].metric("Sharpe", f"{metrics['Sharpe Ratio']:.2f}")
                     
                     # Get open positions
                     open_positions = engine.get_open_positions() if hasattr(engine, 'get_open_positions') else []
