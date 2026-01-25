@@ -11,6 +11,7 @@ from report_generator import create_excel_with_charts, create_pdf_report, prepar
 from monte_carlo import MonteCarloSimulator, extract_trade_pnls, PortfolioMonteCarloSimulator, extract_monthly_returns
 import kite_trader
 import strategy_storage
+import execution_storage
 import datetime
 import io
 import time
@@ -2184,7 +2185,7 @@ with main_tabs[1]:
 # ==================== TAB 3: EXECUTE TRADES ====================
 with main_tabs[2]:
     st.subheader("🚀 Execute Trades on Zerodha")
-    st.markdown("Execute the open positions from your latest backtest on Zerodha using Kite Connect API.")
+    st.markdown("Execute strategy positions live or paper trade from saved strategy templates.")
     
     # Check if Kite is configured
     if not kite_trader.is_kite_configured():
@@ -2214,9 +2215,7 @@ with main_tabs[2]:
         with auth_col2:
             if is_authenticated:
                 if st.button("🚪 Logout", key="kite_logout_main", use_container_width=True):
-                    # Clear from HuggingFace
                     kite_trader.clear_kite_token_from_hf()
-                    # Clear session state
                     st.session_state.kite_access_token = None
                     st.session_state.kite_user_id = None
                     st.session_state.kite_user_name = None
@@ -2227,117 +2226,435 @@ with main_tabs[2]:
         
         st.markdown("---")
         
-        # Check for open positions in session state
-        open_positions = st.session_state.get('open_positions', [])
-        engine_data = st.session_state.get('engine_data', {})
+        # Strategy Mode Selector
+        strategy_mode = st.radio(
+            "Select Mode",
+            ["📈 New Strategy", "📊 View Past Executions"],
+            horizontal=True,
+            key="exec_strategy_mode"
+        )
         
-        if not open_positions:
-            st.info("📋 No open positions available. Run a backtest first to generate positions.")
-        else:
-            st.markdown("### 📈 Open Positions from Latest Backtest")
+        # ==================== NEW STRATEGY ====================
+        if strategy_mode == "📈 New Strategy":
+            st.markdown("### 📈 Execute New Strategy")
             
-            # Display positions
-            open_df = pd.DataFrame(open_positions)
+            # Get saved strategy templates
+            saved_strategies = strategy_storage.list_strategies() if strategy_storage.is_strategy_storage_configured() else []
             
-            def color_unrealized(val):
-                if val > 0:
-                    return 'color: #28a745; font-weight: bold'
-                elif val < 0:
-                    return 'color: #dc3545; font-weight: bold'
-                return ''
-            
-            styled_open = open_df.style.applymap(
-                color_unrealized, subset=['Unrealized ROI %']
-            )
-            st.dataframe(styled_open, use_container_width=True, hide_index=True)
-            
-            if is_authenticated:
-                st.markdown("---")
-                st.markdown("### 💰 Execute Orders")
+            if not saved_strategies:
+                st.info("📋 No saved strategy templates. Go to **Backtest** tab and save a strategy first.")
+            else:
+                # Strategy selection
+                col1, col2 = st.columns([1, 1])
                 
-                # Capital input and Execute button
-                trade_col1, trade_col2 = st.columns([1, 1])
+                with col1:
+                    selected_template = st.selectbox(
+                        "Select Strategy Template",
+                        saved_strategies,
+                        key="exec_template_select"
+                    )
                 
-                with trade_col1:
-                    trade_capital = st.number_input(
+                with col2:
+                    execution_name = st.text_input(
+                        "Execution Name",
+                        placeholder="e.g., My Momentum Jan 2026",
+                        help="Give a unique name to this execution for tracking",
+                        key="exec_name_input"
+                    )
+                
+                # Capital and Run Backtest
+                cap_col, btn_col = st.columns([1, 1])
+                
+                with cap_col:
+                    exec_capital = st.number_input(
                         "Capital to Deploy (₹)",
                         min_value=10000,
                         max_value=10000000,
                         value=100000,
                         step=10000,
-                        help="Enter the capital to deploy. Orders will be sized using Inverse Volatility.",
-                        key="trade_capital_main"
+                        key="exec_capital"
                     )
                 
-                with trade_col2:
-                    st.write("")  # Spacing
-                    st.write("")  # Spacing
-                    execute_clicked = st.button(
-                        "📤 Execute Trades",
-                        type="primary",
+                with btn_col:
+                    st.write("")
+                    st.write("")
+                    run_backtest_clicked = st.button(
+                        "🔄 Run Backtest",
+                        type="secondary",
                         use_container_width=True,
-                        help="Place market orders for all open positions",
-                        key="execute_trades_main"
+                        key="exec_run_backtest"
                     )
                 
-                # Calculate and show order preview
-                calculated_orders = kite_trader.calculate_order_quantities(
-                    open_positions,
-                    trade_capital,
-                    engine_data,
-                    max_position_pct=25.0
+                # Run backtest and show positions
+                if run_backtest_clicked and selected_template:
+                    # Load strategy config
+                    strategy_config = strategy_storage.load_strategy(selected_template)
+                    
+                    if strategy_config:
+                        with st.spinner("Running backtest..."):
+                            try:
+                                # Get universe
+                                universe_name = strategy_config.get('universe', 'NIFTY 100')
+                                if universe_name == "Custom":
+                                    universe = strategy_config.get('custom_stocks', [])
+                                else:
+                                    universe = get_universe(universe_name)
+                                
+                                # Parse dates
+                                start_date = datetime.datetime.strptime(
+                                    strategy_config.get('start_date', '2020-01-01'), '%Y-%m-%d'
+                                ).date()
+                                end_date = datetime.datetime.strptime(
+                                    strategy_config.get('end_date', datetime.datetime.now().strftime('%Y-%m-%d')), '%Y-%m-%d'
+                                ).date()
+                                
+                                # Run engine
+                                engine = PortfolioEngine(
+                                    universe, start_date, end_date, 
+                                    exec_capital, 
+                                    data_source="yahoo"
+                                )
+                                
+                                if engine.fetch_data():
+                                    # Build configs
+                                    rebal_config = {
+                                        'frequency': strategy_config.get('rebalance_label', 'Monthly'),
+                                        'date': strategy_config.get('rebalance_date', 1),
+                                        'day': strategy_config.get('rebal_day'),
+                                        'alt_day': strategy_config.get('alt_day_option', 'Next Day')
+                                    }
+                                    
+                                    position_sizing_config = {
+                                        'method': strategy_config.get('position_sizing_method', 'equal_weight').lower().replace(' ', '_'),
+                                        'use_cap': strategy_config.get('use_max_position_cap', False),
+                                        'max_pct': strategy_config.get('max_position_pct', 15)
+                                    }
+                                    
+                                    regime_config = strategy_config.get('regime_config')
+                                    uncorrelated_config = strategy_config.get('uncorrelated_config')
+                                    
+                                    engine.run_rebalance_strategy(
+                                        strategy_config.get('formula', '6 Month Performance'),
+                                        strategy_config.get('num_stocks', 5),
+                                        strategy_config.get('exit_rank', 10),
+                                        rebal_config,
+                                        regime_config,
+                                        uncorrelated_config,
+                                        strategy_config.get('reinvest_profits', True),
+                                        position_sizing_config
+                                    )
+                                    
+                                    metrics = engine.get_metrics()
+                                    
+                                    # Store in session state
+                                    st.session_state['exec_engine'] = engine
+                                    st.session_state['exec_metrics'] = metrics
+                                    st.session_state['exec_strategy_config'] = strategy_config
+                                    st.session_state['exec_template_name'] = selected_template
+                                    
+                                    st.success("✅ Backtest complete!")
+                                else:
+                                    st.error("Failed to fetch data for backtest.")
+                            except Exception as e:
+                                st.error(f"Backtest error: {e}")
+                    else:
+                        st.error("Failed to load strategy template.")
+                
+                # Display positions and execute buttons if backtest was run
+                if 'exec_engine' in st.session_state and st.session_state.get('exec_engine'):
+                    engine = st.session_state['exec_engine']
+                    metrics = st.session_state['exec_metrics']
+                    
+                    st.markdown("---")
+                    
+                    # Show key metrics
+                    metric_cols = st.columns(4)
+                    metric_cols[0].metric("Final Value", f"₹{metrics['Final Value']:,.0f}")
+                    metric_cols[1].metric("CAGR", f"{metrics['CAGR %']:.2f}%")
+                    metric_cols[2].metric("Max Drawdown", f"{metrics['Max Drawdown %']:.2f}%")
+                    metric_cols[3].metric("Sharpe", f"{metrics['Sharpe Ratio']:.2f}")
+                    
+                    # Get open positions
+                    open_positions = engine.get_open_positions() if hasattr(engine, 'get_open_positions') else []
+                    
+                    if open_positions:
+                        st.markdown("### 📊 Current Open Positions")
+                        open_df = pd.DataFrame(open_positions)
+                        
+                        def color_pnl(val):
+                            if isinstance(val, (int, float)):
+                                if val > 0:
+                                    return 'color: #28a745; font-weight: bold'
+                                elif val < 0:
+                                    return 'color: #dc3545; font-weight: bold'
+                            return ''
+                        
+                        if 'Unrealized ROI %' in open_df.columns:
+                            styled_df = open_df.style.applymap(color_pnl, subset=['Unrealized ROI %'])
+                        else:
+                            styled_df = open_df
+                        
+                        st.dataframe(styled_df, use_container_width=True, hide_index=True)
+                        
+                        # Calculate orders
+                        engine_data = st.session_state.get('engine_data', {})
+                        calculated_orders = kite_trader.calculate_order_quantities(
+                            open_positions, exec_capital, engine_data, max_position_pct=25.0
+                        )
+                        
+                        if calculated_orders:
+                            st.markdown("#### 📋 Order Preview")
+                            preview_df = pd.DataFrame(calculated_orders)
+                            if 'note' in preview_df.columns:
+                                preview_df = preview_df[['tradingsymbol', 'quantity', 'price', 'weight_pct', 'estimated_value', 'note']]
+                                preview_df.columns = ['Stock', 'Qty', 'Price (₹)', 'Weight %', 'Est. Value (₹)', 'Note']
+                            else:
+                                preview_df = preview_df[['tradingsymbol', 'quantity', 'price', 'weight_pct', 'estimated_value']]
+                                preview_df.columns = ['Stock', 'Qty', 'Price (₹)', 'Weight %', 'Est. Value (₹)']
+                            st.dataframe(preview_df, use_container_width=True, hide_index=True)
+                            
+                            total_value = sum(o['estimated_value'] for o in calculated_orders)
+                            st.caption(f"**Total:** ₹{total_value:,.2f} | **Unused:** ₹{exec_capital - total_value:,.2f}")
+                        
+                        st.markdown("---")
+                        
+                        # Execution buttons
+                        if not execution_name:
+                            st.warning("⚠️ Please enter an Execution Name above before executing.")
+                        else:
+                            exec_col1, exec_col2 = st.columns(2)
+                            
+                            with exec_col1:
+                                paper_clicked = st.button(
+                                    "📄 Paper Execute",
+                                    use_container_width=True,
+                                    help="Simulate execution without placing real orders",
+                                    key="paper_execute_btn"
+                                )
+                            
+                            with exec_col2:
+                                if is_authenticated:
+                                    live_clicked = st.button(
+                                        "🚀 Live Execute",
+                                        type="primary",
+                                        use_container_width=True,
+                                        help="Place real orders on Zerodha",
+                                        key="live_execute_btn"
+                                    )
+                                else:
+                                    st.info("🔐 Login to execute live trades")
+                                    live_clicked = False
+                            
+                            # Handle Paper Execute
+                            if paper_clicked:
+                                with st.spinner("Saving paper execution..."):
+                                    # Build trades from orders
+                                    trades = []
+                                    for order in calculated_orders:
+                                        if order['quantity'] > 0:
+                                            trades.append({
+                                                'date': datetime.datetime.now().strftime('%Y-%m-%d'),
+                                                'stock': order['tradingsymbol'],
+                                                'action': 'BUY',
+                                                'quantity': order['quantity'],
+                                                'price': order['price'],
+                                                'value': order['estimated_value'],
+                                                'status': 'PAPER'
+                                            })
+                                    
+                                    # Build portfolio values
+                                    portfolio_values = []
+                                    if hasattr(engine, 'portfolio_df') and not engine.portfolio_df.empty:
+                                        for idx, row in engine.portfolio_df.iterrows():
+                                            portfolio_values.append({
+                                                'date': idx.strftime('%Y-%m-%d'),
+                                                'value': row['Portfolio Value']
+                                            })
+                                    
+                                    # Save execution
+                                    success = execution_storage.save_execution(
+                                        name=execution_name,
+                                        strategy_template=st.session_state.get('exec_template_name', selected_template),
+                                        mode='paper',
+                                        capital=exec_capital,
+                                        trades=trades,
+                                        portfolio_values=portfolio_values,
+                                        open_positions=open_positions
+                                    )
+                                    
+                                    if success:
+                                        st.success(f"✅ Paper execution saved: **{execution_name}**")
+                                        st.balloons()
+                                    else:
+                                        st.error("Failed to save paper execution.")
+                            
+                            # Handle Live Execute
+                            if live_clicked:
+                                with st.spinner("Placing orders on Zerodha..."):
+                                    result = kite_trader.execute_orders_on_kite(calculated_orders, dry_run=False)
+                                    
+                                    # Build trades from result
+                                    trades = []
+                                    for order in result.get('orders_placed', []):
+                                        trades.append({
+                                            'date': datetime.datetime.now().strftime('%Y-%m-%d'),
+                                            'stock': order['tradingsymbol'],
+                                            'action': 'BUY',
+                                            'quantity': order['quantity'],
+                                            'order_id': order.get('order_id', ''),
+                                            'status': 'PLACED'
+                                        })
+                                    
+                                    for order in result.get('orders_failed', []):
+                                        trades.append({
+                                            'date': datetime.datetime.now().strftime('%Y-%m-%d'),
+                                            'stock': order['tradingsymbol'],
+                                            'action': 'BUY',
+                                            'quantity': order['quantity'],
+                                            'status': 'FAILED',
+                                            'error': order.get('message', '')
+                                        })
+                                    
+                                    # Build portfolio values
+                                    portfolio_values = []
+                                    if hasattr(engine, 'portfolio_df') and not engine.portfolio_df.empty:
+                                        for idx, row in engine.portfolio_df.iterrows():
+                                            portfolio_values.append({
+                                                'date': idx.strftime('%Y-%m-%d'),
+                                                'value': row['Portfolio Value']
+                                            })
+                                    
+                                    # Save execution
+                                    execution_storage.save_execution(
+                                        name=execution_name,
+                                        strategy_template=st.session_state.get('exec_template_name', selected_template),
+                                        mode='live',
+                                        capital=exec_capital,
+                                        trades=trades,
+                                        portfolio_values=portfolio_values,
+                                        open_positions=open_positions
+                                    )
+                                    
+                                    if result['success']:
+                                        st.success(f"✅ {result['message']} - Execution saved as **{execution_name}**")
+                                        if result['orders_placed']:
+                                            st.markdown("**Orders Placed:**")
+                                            for order in result['orders_placed']:
+                                                st.write(f"• {order['tradingsymbol']}: {order['quantity']} shares - ID: {order.get('order_id', 'N/A')}")
+                                    else:
+                                        st.error(f"❌ {result['message']}")
+                                    
+                                    if result['orders_failed']:
+                                        st.markdown("**Failed Orders:**")
+                                        for order in result['orders_failed']:
+                                            st.error(f"• {order['tradingsymbol']}: {order['message']}")
+                    else:
+                        st.info("No open positions from backtest.")
+        
+        # ==================== VIEW PAST EXECUTIONS ====================
+        else:
+            st.markdown("### 📊 Past Executions")
+            
+            # Get saved executions
+            executions = execution_storage.list_executions() if execution_storage.is_execution_storage_configured() else []
+            
+            if not executions:
+                st.info("📋 No past executions found. Execute a strategy first.")
+            else:
+                # Build dropdown options
+                exec_options = [f"{e['name']} ({e['mode'].upper()}, {e['created_at'][:10]})" for e in executions]
+                exec_names = [e['name'] for e in executions]
+                
+                selected_exec_idx = st.selectbox(
+                    "Select Execution",
+                    range(len(exec_options)),
+                    format_func=lambda i: exec_options[i],
+                    key="past_exec_select"
                 )
                 
-                if calculated_orders:
-                    st.markdown("#### 📋 Order Preview (Inverse Volatility Sizing)")
-                    preview_df = pd.DataFrame(calculated_orders)
+                if selected_exec_idx is not None:
+                    selected_exec_name = exec_names[selected_exec_idx]
+                    execution_data = execution_storage.load_execution(selected_exec_name)
                     
-                    # Check for stocks with 0 quantity
-                    zero_qty_orders = [o for o in calculated_orders if o['quantity'] == 0]
-                    
-                    # Select columns to show
-                    if 'note' in preview_df.columns:
-                        preview_df = preview_df[['tradingsymbol', 'quantity', 'price', 'weight_pct', 'estimated_value', 'note']]
-                        preview_df.columns = ['Stock', 'Qty', 'Price (₹)', 'Weight %', 'Est. Value (₹)', 'Note']
-                    else:
-                        preview_df = preview_df[['tradingsymbol', 'quantity', 'price', 'weight_pct', 'estimated_value']]
-                        preview_df.columns = ['Stock', 'Qty', 'Price (₹)', 'Weight %', 'Est. Value (₹)']
-                    
-                    st.dataframe(preview_df, use_container_width=True, hide_index=True)
-                    
-                    # Warning for stocks with 0 quantity
-                    if zero_qty_orders:
-                        st.warning(f"⚠️ {len(zero_qty_orders)} stock(s) have 0 quantity (price too high for allocated capital). Increase capital to buy these.")
-                    
-                    total_value = sum(o['estimated_value'] for o in calculated_orders)
-                    st.caption(f"**Total Estimated Value:** ₹{total_value:,.2f} | **Unused Capital:** ₹{trade_capital - total_value:,.2f}")
-                else:
-                    st.warning("Unable to calculate order quantities. Check if price data is available.")
-                
-                # Execute orders
-                if execute_clicked:
-                    if not calculated_orders:
-                        st.error("No valid orders to execute.")
-                    else:
-                        with st.spinner("Placing orders on Zerodha..."):
-                            result = kite_trader.execute_orders_on_kite(calculated_orders, dry_run=False)
+                    if execution_data:
+                        # Execution summary
+                        st.markdown("---")
+                        info_cols = st.columns(4)
+                        info_cols[0].metric("Mode", execution_data.get('mode', '').upper())
+                        info_cols[1].metric("Capital", f"₹{execution_data.get('capital', 0):,.0f}")
+                        info_cols[2].metric("Template", execution_data.get('strategy_template', 'N/A'))
+                        info_cols[3].metric("Trades", len(execution_data.get('trades', [])))
                         
-                        if result['success']:
-                            st.success(f"✅ {result['message']}")
+                        st.caption(f"Created: {execution_data.get('created_at', '')[:19]} | Last Updated: {execution_data.get('last_updated', '')[:19]}")
+                        
+                        # Trade log
+                        trades = execution_data.get('trades', [])
+                        if trades:
+                            st.markdown("### 📝 Trade Log")
+                            trades_df = pd.DataFrame(trades)
+                            st.dataframe(trades_df, use_container_width=True, hide_index=True)
+                        
+                        # Portfolio values / charts
+                        portfolio_values = execution_data.get('portfolio_values', [])
+                        if portfolio_values and len(portfolio_values) > 1:
+                            st.markdown("### 📈 Performance Charts")
                             
-                            if result['orders_placed']:
-                                st.markdown("**Orders Placed:**")
-                                for order in result['orders_placed']:
-                                    st.write(f"• {order['tradingsymbol']}: {order['quantity']} shares - Order ID: {order.get('order_id', 'N/A')}")
-                        else:
-                            st.error(f"❌ {result['message']}")
+                            pv_df = pd.DataFrame(portfolio_values)
+                            pv_df['date'] = pd.to_datetime(pv_df['date'])
+                            pv_df = pv_df.sort_values('date')
+                            
+                            chart_tabs = st.tabs(["Equity Curve", "Drawdown"])
+                            
+                            with chart_tabs[0]:
+                                fig_equity = go.Figure()
+                                fig_equity.add_trace(go.Scatter(
+                                    x=pv_df['date'],
+                                    y=pv_df['value'],
+                                    fill='tozeroy',
+                                    line_color='#28a745',
+                                    name='Portfolio Value'
+                                ))
+                                fig_equity.update_layout(
+                                    title="Equity Curve",
+                                    xaxis_title="Date",
+                                    yaxis_title="Portfolio Value (₹)",
+                                    height=350,
+                                    margin=dict(l=0,r=0,t=40,b=0),
+                                    template='plotly_white'
+                                )
+                                st.plotly_chart(fig_equity, use_container_width=True)
+                            
+                            with chart_tabs[1]:
+                                # Calculate drawdown
+                                pv_df['running_max'] = pv_df['value'].cummax()
+                                pv_df['drawdown'] = (pv_df['value'] - pv_df['running_max']) / pv_df['running_max'] * 100
+                                
+                                fig_dd = go.Figure()
+                                fig_dd.add_trace(go.Scatter(
+                                    x=pv_df['date'],
+                                    y=pv_df['drawdown'],
+                                    fill='tozeroy',
+                                    line_color='#dc3545',
+                                    name='Drawdown'
+                                ))
+                                fig_dd.update_layout(
+                                    title="Drawdown",
+                                    xaxis_title="Date",
+                                    yaxis_title="Drawdown %",
+                                    height=350,
+                                    margin=dict(l=0,r=0,t=40,b=0),
+                                    template='plotly_white'
+                                )
+                                st.plotly_chart(fig_dd, use_container_width=True)
                         
-                        if result['orders_failed']:
-                            st.markdown("**Failed Orders:**")
-                            for order in result['orders_failed']:
-                                st.error(f"• {order['tradingsymbol']}: {order['message']}")
-            else:
-                st.info("🔐 Login to Zerodha to execute trades.")
+                        # Delete button
+                        st.markdown("---")
+                        if st.button("🗑️ Delete Execution", key="delete_exec_btn"):
+                            if execution_storage.delete_execution(selected_exec_name):
+                                st.success(f"✅ Deleted: {selected_exec_name}")
+                                st.rerun()
+                    else:
+                        st.error("Failed to load execution data.")
 
 # ==================== TAB 4: DATA DOWNLOAD ====================
 with main_tabs[3]:
