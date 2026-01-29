@@ -7,15 +7,16 @@ class ScoreParser:
         # Metric types that support dynamic month values (1-24 months)
         self.metric_types = [
             'Performance', 'Volatility', 'Downside Volatility',
-            'Max Drawdown', 'Sharpe', 'Sortino', 'Calmar'
+            'Max Drawdown', 'Sharpe', 'Sortino', 'Calmar',
+            'Positive Days', 'Negative Days'
         ]
         
         # Pattern to match dynamic metrics like "15 Month Performance", "10 Week Performance" or "1 Year Performance"
         # Supports: "N Month MetricType" (1-24), "N Week MetricType" (1-52), or "1 Year MetricType"
         self.metric_pattern = re.compile(
-            r'(\d{1,2})\s+Month\s+(Performance|Volatility|Downside Volatility|Max Drawdown|Sharpe|Sortino|Calmar)|'
-            r'(\d{1,2})\s+Week\s+(Performance|Volatility|Downside Volatility|Max Drawdown|Sharpe|Sortino|Calmar)|'
-            r'1\s+Year\s+(Performance|Volatility|Downside Volatility|Max Drawdown|Sharpe|Sortino|Calmar)',
+            r'(\d{1,2})\s+Month\s+(Performance|Volatility|Downside Volatility|Max Drawdown|Sharpe|Sortino|Calmar|Positive Days|Negative Days)|'
+            r'(\d{1,2})\s+Week\s+(Performance|Volatility|Downside Volatility|Max Drawdown|Sharpe|Sortino|Calmar|Positive Days|Negative Days)|'
+            r'1\s+Year\s+(Performance|Volatility|Downside Volatility|Max Drawdown|Sharpe|Sortino|Calmar|Positive Days|Negative Days)',
             re.IGNORECASE
         )
         
@@ -64,6 +65,10 @@ class ScoreParser:
                             '9 Month Sortino', '1 Year Sortino'],
             'Calmar Ratio': ['1 Month Calmar', '3 Month Calmar', '6 Month Calmar',
                            '9 Month Calmar', '1 Year Calmar'],
+            '% Positive Days': ['1 Month Positive Days', '3 Month Positive Days', '6 Month Positive Days',
+                               '9 Month Positive Days', '1 Year Positive Days'],
+            '% Negative Days': ['1 Month Negative Days', '3 Month Negative Days', '6 Month Negative Days',
+                               '9 Month Negative Days', '1 Year Negative Days'],
         }
     
     def extract_required_periods(self, formula):
@@ -232,4 +237,8 @@ class ScoreParser:
             "Momentum Persistence": "6 Month Performance / (1 + 6 Month Volatility)",
             "Quality-Adjusted Trend": "(6 Month Performance * 6 Month Sharpe) / 6 Month Max Drawdown",
             "Regime-Adaptive Momentum": "(9 Month Performance * 3 Month Sharpe) / 1 Month Volatility",
+            # Positive/Negative Days formulas
+            "Consistency Focus": "6 Month Positive Days",
+            "Win Rate Momentum": "6 Month Performance * 6 Month Positive Days",
+            "Downside Avoidance": "6 Month Performance / 6 Month Negative Days",
         }

@@ -166,6 +166,18 @@ class IndicatorLibrary:
                 dd_col = f'{name} Max Drawdown'
                 calmar = df[perf_col] / df[dd_col].abs()
                 df[col_name] = calmar.replace([np.inf, -np.inf], 0)
+            
+            # 7. % Positive Days - percentage of days with positive returns
+            col_name = f'{name} Positive Days'
+            if col_name not in df.columns:
+                positive_mask = (daily_returns > 0).astype(float)
+                df[col_name] = positive_mask.rolling(window).mean()
+            
+            # 8. % Negative Days - percentage of days with negative returns
+            col_name = f'{name} Negative Days'
+            if col_name not in df.columns:
+                negative_mask = (daily_returns < 0).astype(float)
+                df[col_name] = negative_mask.rolling(window).mean()
         
         df.fillna(0, inplace=True)
         return df
