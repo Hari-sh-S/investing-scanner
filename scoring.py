@@ -8,15 +8,16 @@ class ScoreParser:
         self.metric_types = [
             'Performance', 'Volatility', 'Downside Volatility',
             'Max Drawdown', 'Sharpe', 'Sortino', 'Calmar',
-            'Positive Days', 'Negative Days'
+            'Positive Days', 'Negative Days',
+            'Distance From High', 'Distance From Low'
         ]
         
         # Pattern to match dynamic metrics like "15 Month Performance", "10 Week Performance" or "1 Year Performance"
         # Supports: "N Month MetricType" (1-24), "N Week MetricType" (1-52), or "1 Year MetricType"
         self.metric_pattern = re.compile(
-            r'(\d{1,2})\s+Month\s+(Performance|Volatility|Downside Volatility|Max Drawdown|Sharpe|Sortino|Calmar|Positive Days|Negative Days)|'
-            r'(\d{1,2})\s+Week\s+(Performance|Volatility|Downside Volatility|Max Drawdown|Sharpe|Sortino|Calmar|Positive Days|Negative Days)|'
-            r'1\s+Year\s+(Performance|Volatility|Downside Volatility|Max Drawdown|Sharpe|Sortino|Calmar|Positive Days|Negative Days)',
+            r'(\d{1,2})\s+Month\s+(Performance|Volatility|Downside Volatility|Max Drawdown|Sharpe|Sortino|Calmar|Positive Days|Negative Days|Distance From High|Distance From Low)|'
+            r'(\d{1,2})\s+Week\s+(Performance|Volatility|Downside Volatility|Max Drawdown|Sharpe|Sortino|Calmar|Positive Days|Negative Days|Distance From High|Distance From Low)|'
+            r'1\s+Year\s+(Performance|Volatility|Downside Volatility|Max Drawdown|Sharpe|Sortino|Calmar|Positive Days|Negative Days|Distance From High|Distance From Low)',
             re.IGNORECASE
         )
         
@@ -69,6 +70,10 @@ class ScoreParser:
                                '9 Month Positive Days', '1 Year Positive Days'],
             '% Negative Days': ['1 Month Negative Days', '3 Month Negative Days', '6 Month Negative Days',
                                '9 Month Negative Days', '1 Year Negative Days'],
+            '% Distance From High': ['1 Month Distance From High', '3 Month Distance From High', '6 Month Distance From High',
+                                    '9 Month Distance From High', '1 Year Distance From High'],
+            '% Distance From Low': ['1 Month Distance From Low', '3 Month Distance From Low', '6 Month Distance From Low',
+                                   '9 Month Distance From Low', '1 Year Distance From Low'],
         }
     
     def extract_required_periods(self, formula):
@@ -241,4 +246,8 @@ class ScoreParser:
             "Consistency Focus": "6 Month Positive Days",
             "Win Rate Momentum": "6 Month Performance * 6 Month Positive Days",
             "Downside Avoidance": "6 Month Performance / 6 Month Negative Days",
+            # Distance from High/Low formulas
+            "Near 52W High": "1 / (1 + 1 Year Distance From High)",
+            "Breakout Momentum": "6 Month Performance / (1 + 6 Month Distance From High)",
+            "Value + Momentum": "6 Month Performance * 6 Month Distance From Low",
         }

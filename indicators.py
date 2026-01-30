@@ -178,6 +178,21 @@ class IndicatorLibrary:
             if col_name not in df.columns:
                 negative_mask = (daily_returns < 0).astype(float)
                 df[col_name] = negative_mask.rolling(window).mean()
+            
+            # 9. % Distance From High - (rolling_high - close) / close
+            # Shows how far below the N-period high the stock is (0 = at high, positive = below high)
+            col_name = f'{name} Distance From High'
+            if col_name not in df.columns:
+                rolling_high = close.rolling(window).max()
+                df[col_name] = (rolling_high - close) / close
+            
+            # 10. % Distance From Low - (close - rolling_low) / rolling_low
+            # Shows how far above the N-period low the stock is (0 = at low, positive = above low)
+            col_name = f'{name} Distance From Low'
+            if col_name not in df.columns:
+                rolling_low = close.rolling(window).min()
+                distance_from_low = (close - rolling_low) / rolling_low
+                df[col_name] = distance_from_low.replace([np.inf, -np.inf], 0)
         
         df.fillna(0, inplace=True)
         return df
