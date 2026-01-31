@@ -1,5 +1,6 @@
 # NIFTY Universe Data - 19 Broad Market Indices Only
-# Last Updated: 2026-01-03
+# Last Updated: 2026-01-31
+# Version: 1.1 - Added SMA/EMA timeframe variants support
 # Source: https://www.niftyindices.com/reports/index-factsheet
 
 # All 19 Broad Market Indices using exact NSE API names
