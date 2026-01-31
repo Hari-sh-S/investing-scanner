@@ -684,14 +684,40 @@ class PortfolioEngine:
                 return float(val.iloc[0])
             return float(val) if val is not None else 0.0
         
-        if regime_type == 'EMA':
-            ema_period = regime_config['value']
-            ema_col = f'EMA_{ema_period}'
+        # SMA timeframe variants
+        if regime_type in ['SMA_1D', 'SMA_1W', 'SMA_1M']:
+            # Map to correct direction column
+            direction_col = f'{regime_type}_Direction'
+            sma_direction = row.get(direction_col, 'BUY')
+            if hasattr(sma_direction, 'iloc'):
+                sma_direction = sma_direction.iloc[0]
+            triggered = sma_direction == 'SELL'
             close_price = get_scalar(row.get('Close', 0))
-            ema_value = get_scalar(row.get(ema_col, 0))
-            
-            triggered = ema_col in row.index and ema_value > 0 and close_price < ema_value
-            print(f"REGIME CHECK [{date}]: Close={close_price:.2f}, {ema_col}={ema_value:.2f}, Triggered={triggered}")
+            sma_value = get_scalar(row.get(regime_type, 0))
+            print(f"REGIME CHECK [{date}]: {regime_type} Close={close_price:.2f}, Value={sma_value:.2f}, Direction={sma_direction}, Triggered={triggered}")
+            if triggered:
+                return True, regime_config['action'], 0.0
+        
+        # EMA timeframe variants
+        elif regime_type in ['EMA', 'EMA_1D', 'EMA_1W', 'EMA_1M']:
+            # Handle legacy EMA type
+            if regime_type == 'EMA':
+                ema_period = regime_config['value']
+                ema_col = f'EMA_{ema_period}'
+                close_price = get_scalar(row.get('Close', 0))
+                ema_value = get_scalar(row.get(ema_col, 0))
+                triggered = ema_col in row.index and ema_value > 0 and close_price < ema_value
+                print(f"REGIME CHECK [{date}]: Close={close_price:.2f}, {ema_col}={ema_value:.2f}, Triggered={triggered}")
+            else:
+                # New EMA timeframe variants
+                direction_col = f'{regime_type}_Direction'
+                ema_direction = row.get(direction_col, 'BUY')
+                if hasattr(ema_direction, 'iloc'):
+                    ema_direction = ema_direction.iloc[0]
+                triggered = ema_direction == 'SELL'
+                close_price = get_scalar(row.get('Close', 0))
+                ema_value = get_scalar(row.get(regime_type, 0))
+                print(f"REGIME CHECK [{date}]: {regime_type} Close={close_price:.2f}, Value={ema_value:.2f}, Direction={ema_direction}, Triggered={triggered}")
             
             # Triggered when index closes BELOW EMA
             if triggered:
@@ -988,9 +1014,23 @@ class PortfolioEngine:
                             except:
                                 pass
                     
+                    # Parse SMA period if this is an SMA regime filter
+                    sma_period = 50  # default
+                    if regime_config.get('type', '').startswith('SMA'):
+                        sma_period = int(regime_config.get('value', 50))
+                        print(f"Using SMA Period={sma_period}")
+                    
+                    # Parse EMA period if this is an EMA regime filter
+                    ema_period = 68  # default
+                    if regime_config.get('type', '').startswith('EMA'):
+                        ema_period = int(regime_config.get('value', 68))
+                        print(f"Using EMA Period={ema_period}")
+                    
                     regime_data = IndicatorLibrary.add_regime_filters(regime_data, 
                                                                        supertrend_period=st_period, 
-                                                                       supertrend_multiplier=st_mult)
+                                                                       supertrend_multiplier=st_mult,
+                                                                       sma_period=sma_period,
+                                                                       ema_period=ema_period)
                     
                     # Add Donchian channels if needed
                     if regime_config.get('type') == 'DONCHIAN':

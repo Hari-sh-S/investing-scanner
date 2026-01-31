@@ -198,13 +198,15 @@ class IndicatorLibrary:
         return df
     
     @staticmethod
-    def add_regime_filters(df, supertrend_period=7, supertrend_multiplier=3):
+    def add_regime_filters(df, supertrend_period=7, supertrend_multiplier=3, sma_period=50, ema_period=68):
         """Optimized regime indicators - only calculate what's needed.
         
         Args:
             df: DataFrame with OHLCV data
             supertrend_period: ATR period for SuperTrend (default 7)
             supertrend_multiplier: Band multiplier for SuperTrend (default 3)
+            sma_period: Period for SMA regime filter (default 50)
+            ema_period: Period for EMA regime filter (default 68)
         """
         if isinstance(df, pd.Series):
             raise ValueError("Input must be a DataFrame, not a Series")
@@ -213,11 +215,82 @@ class IndicatorLibrary:
         high = df['High'].squeeze() if isinstance(df['High'], pd.DataFrame) else df['High']
         low = df['Low'].squeeze() if isinstance(df['Low'], pd.DataFrame) else df['Low']
         
-        # 1. EMAs (batch calculate for efficiency)
+        # Prepare df_temp for resampling (needs DatetimeIndex)
+        if df.index.name != 'Date':
+            df_temp = df.copy()
+            if 'Date' in df.columns:
+                df_temp = df_temp.set_index('Date')
+        else:
+            df_temp = df
+        
+        # 1a. SMA - Daily (1D)
+        df[f'SMA_{sma_period}'] = close.rolling(sma_period).mean()
+        df['SMA_1D'] = df[f'SMA_{sma_period}']
+        df['SMA_1D_Direction'] = np.where(close > df['SMA_1D'], 'BUY', 'SELL')
+        
+        # 1b. SMA - Weekly (1W)
+        try:
+            weekly_close = df_temp['Close'].resample('W').last().dropna()
+            if len(weekly_close) >= sma_period:
+                weekly_sma = weekly_close.rolling(sma_period).mean()
+                df['SMA_1W'] = weekly_sma.reindex(df_temp.index, method='ffill')
+                df['SMA_1W_Direction'] = np.where(close > df['SMA_1W'], 'BUY', 'SELL')
+            else:
+                df['SMA_1W'] = df['SMA_1D']
+                df['SMA_1W_Direction'] = df['SMA_1D_Direction']
+        except Exception:
+            df['SMA_1W'] = df['SMA_1D']
+            df['SMA_1W_Direction'] = df['SMA_1D_Direction']
+        
+        # 1c. SMA - Monthly (1M)
+        try:
+            monthly_close = df_temp['Close'].resample('ME').last().dropna()
+            if len(monthly_close) >= min(sma_period, 12):  # Use smaller period for monthly
+                monthly_sma = monthly_close.rolling(min(sma_period, 12)).mean()
+                df['SMA_1M'] = monthly_sma.reindex(df_temp.index, method='ffill')
+                df['SMA_1M_Direction'] = np.where(close > df['SMA_1M'], 'BUY', 'SELL')
+            else:
+                df['SMA_1M'] = df['SMA_1D']
+                df['SMA_1M_Direction'] = df['SMA_1D_Direction']
+        except Exception:
+            df['SMA_1M'] = df['SMA_1D']
+            df['SMA_1M_Direction'] = df['SMA_1D_Direction']
+        
+        # 2a. EMA - Daily (1D)
         for period in [34, 68, 100, 150, 200]:
             df[f'EMA_{period}'] = close.ewm(span=period, adjust=False).mean()
+        df['EMA_1D'] = close.ewm(span=ema_period, adjust=False).mean()
+        df['EMA_1D_Direction'] = np.where(close > df['EMA_1D'], 'BUY', 'SELL')
         
-        # 2. MACD (single calculation)
+        # 2b. EMA - Weekly (1W)
+        try:
+            weekly_close = df_temp['Close'].resample('W').last().dropna()
+            if len(weekly_close) >= ema_period:
+                weekly_ema = weekly_close.ewm(span=ema_period, adjust=False).mean()
+                df['EMA_1W'] = weekly_ema.reindex(df_temp.index, method='ffill')
+                df['EMA_1W_Direction'] = np.where(close > df['EMA_1W'], 'BUY', 'SELL')
+            else:
+                df['EMA_1W'] = df['EMA_1D']
+                df['EMA_1W_Direction'] = df['EMA_1D_Direction']
+        except Exception:
+            df['EMA_1W'] = df['EMA_1D']
+            df['EMA_1W_Direction'] = df['EMA_1D_Direction']
+        
+        # 2c. EMA - Monthly (1M)
+        try:
+            monthly_close = df_temp['Close'].resample('ME').last().dropna()
+            if len(monthly_close) >= min(ema_period, 12):  # Use smaller period for monthly
+                monthly_ema = monthly_close.ewm(span=min(ema_period, 12), adjust=False).mean()
+                df['EMA_1M'] = monthly_ema.reindex(df_temp.index, method='ffill')
+                df['EMA_1M_Direction'] = np.where(close > df['EMA_1M'], 'BUY', 'SELL')
+            else:
+                df['EMA_1M'] = df['EMA_1D']
+                df['EMA_1M_Direction'] = df['EMA_1D_Direction']
+        except Exception:
+            df['EMA_1M'] = df['EMA_1D']
+            df['EMA_1M_Direction'] = df['EMA_1D_Direction']
+        
+        # 3. MACD (single calculation)
         ema12 = close.ewm(span=12, adjust=False).mean()
         ema26 = close.ewm(span=26, adjust=False).mean()
         df['MACD'] = ema12 - ema26

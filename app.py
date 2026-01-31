@@ -344,17 +344,25 @@ with main_tabs[0]:
             
             regime_config = None
             if use_regime_filter:
-                regime_type_options = ["EMA", "MACD", "SUPERTREND_1D", "SUPERTREND_1W", "SUPERTREND_1M", "EQUITY", "EQUITY_MA", "DONCHIAN", "SWING_ATR", "BREADTH"]
-                saved_regime_type = saved_regime.get('type', 'EMA')
-                # Handle legacy SUPERTREND -> SUPERTREND_1D migration
+                regime_type_options = [
+                    "SMA_1D", "SMA_1W", "SMA_1M",
+                    "EMA_1D", "EMA_1W", "EMA_1M", 
+                    "MACD", 
+                    "SUPERTREND_1D", "SUPERTREND_1W", "SUPERTREND_1M", 
+                    "EQUITY", "EQUITY_MA", "DONCHIAN", "SWING_ATR", "BREADTH"
+                ]
+                saved_regime_type = saved_regime.get('type', 'EMA_1D')
+                # Handle legacy migrations
                 if saved_regime_type == 'SUPERTREND':
                     saved_regime_type = 'SUPERTREND_1D'
+                elif saved_regime_type == 'EMA':
+                    saved_regime_type = 'EMA_1D'
                 regime_type_idx = regime_type_options.index(saved_regime_type) if saved_regime_type in regime_type_options else 0
                 
                 regime_type = st.selectbox("Regime Filter Type", 
                                           regime_type_options,
                                           index=regime_type_idx,
-                                          help="SuperTrend: 1D=Daily, 1W=Weekly, 1M=Monthly | DONCHIAN: Turtle Trading rules | BREADTH: % stocks above 200 SMA")
+                                          help="SMA/EMA: 1D=Daily, 1W=Weekly, 1M=Monthly | SuperTrend: trend-following | DONCHIAN: Turtle Trading")
                 
                 # Initialize defaults
                 recovery_dd = None
@@ -366,11 +374,27 @@ with main_tabs[0]:
                 breadth_threshold = None
                 breadth_index = None
                 
-                if regime_type == "EMA":
+                if regime_type in ["SMA_1D", "SMA_1W", "SMA_1M"]:
+                    timeframe_labels = {"SMA_1D": "Daily", "SMA_1W": "Weekly", "SMA_1M": "Monthly"}
+                    st.caption(f"📈 SMA on {timeframe_labels[regime_type]} timeframe")
+                    sma_options = [20, 50, 100, 150, 200]
+                    saved_sma = saved_regime.get('value', 50) if saved_regime.get('type', '').startswith('SMA') else 50
+                    if saved_sma not in sma_options:
+                        saved_sma = 50
+                    sma_idx = sma_options.index(saved_sma)
+                    sma_period = st.selectbox("SMA Period", sma_options, index=sma_idx,
+                                             help="Trigger when price falls below SMA")
+                    regime_value = sma_period
+                elif regime_type in ["EMA_1D", "EMA_1W", "EMA_1M"]:
+                    timeframe_labels = {"EMA_1D": "Daily", "EMA_1W": "Weekly", "EMA_1M": "Monthly"}
+                    st.caption(f"📈 EMA on {timeframe_labels[regime_type]} timeframe")
                     ema_options = [34, 68, 100, 150, 200]
-                    saved_ema = saved_regime.get('value', 68) if saved_regime.get('type') == 'EMA' else 68
-                    ema_idx = ema_options.index(saved_ema) if saved_ema in ema_options else 1
-                    ema_period = st.selectbox("EMA Period", ema_options, index=ema_idx)
+                    saved_ema = saved_regime.get('value', 68) if saved_regime.get('type', '').startswith('EMA') else 68
+                    if saved_ema not in ema_options:
+                        saved_ema = 68
+                    ema_idx = ema_options.index(saved_ema)
+                    ema_period = st.selectbox("EMA Period", ema_options, index=ema_idx,
+                                             help="Trigger when price falls below EMA")
                     regime_value = ema_period
                 elif regime_type == "MACD":
                     macd_options = ["35-70-12", "50-100-15", "75-150-12"]
