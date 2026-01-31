@@ -344,14 +344,17 @@ with main_tabs[0]:
             
             regime_config = None
             if use_regime_filter:
-                regime_type_options = ["EMA", "MACD", "SUPERTREND", "EQUITY", "EQUITY_MA", "DONCHIAN", "SWING_ATR", "BREADTH"]
+                regime_type_options = ["EMA", "MACD", "SUPERTREND_1D", "SUPERTREND_1W", "SUPERTREND_1M", "EQUITY", "EQUITY_MA", "DONCHIAN", "SWING_ATR", "BREADTH"]
                 saved_regime_type = saved_regime.get('type', 'EMA')
+                # Handle legacy SUPERTREND -> SUPERTREND_1D migration
+                if saved_regime_type == 'SUPERTREND':
+                    saved_regime_type = 'SUPERTREND_1D'
                 regime_type_idx = regime_type_options.index(saved_regime_type) if saved_regime_type in regime_type_options else 0
                 
                 regime_type = st.selectbox("Regime Filter Type", 
                                           regime_type_options,
                                           index=regime_type_idx,
-                                          help="DONCHIAN: Turtle Trading rules (slow, robust) | SWING_ATR: Pivot with ATR buffer | BREADTH: % stocks above 200 SMA")
+                                          help="SuperTrend: 1D=Daily, 1W=Weekly, 1M=Monthly | DONCHIAN: Turtle Trading rules | BREADTH: % stocks above 200 SMA")
                 
                 # Initialize defaults
                 recovery_dd = None
@@ -375,9 +378,11 @@ with main_tabs[0]:
                     macd_idx = macd_options.index(saved_macd) if saved_macd in macd_options else 0
                     macd_preset = st.selectbox("MACD Settings", macd_options, index=macd_idx)
                     regime_value = macd_preset
-                elif regime_type == "SUPERTREND":
+                elif regime_type in ["SUPERTREND_1D", "SUPERTREND_1W", "SUPERTREND_1M"]:
+                    timeframe_labels = {"SUPERTREND_1D": "Daily", "SUPERTREND_1W": "Weekly", "SUPERTREND_1M": "Monthly"}
+                    st.caption(f"📊 SuperTrend on {timeframe_labels[regime_type]} timeframe")
                     st_options = ["1-1", "1-2", "1-2.5"]
-                    saved_st = saved_regime.get('value', '1-2') if saved_regime.get('type') == 'SUPERTREND' else '1-2'
+                    saved_st = saved_regime.get('value', '1-2') if saved_regime.get('type', '').startswith('SUPERTREND') else '1-2'
                     st_idx = st_options.index(saved_st) if saved_st in st_options else 1
                     st_preset = st.selectbox("SuperTrend (Period-Multiplier)", st_options, index=st_idx)
                     regime_value = st_preset

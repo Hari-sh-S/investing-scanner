@@ -705,13 +705,21 @@ class PortfolioEngine:
             if triggered:
                 return True, regime_config['action'], 0.0
         
-        elif regime_type == 'SUPERTREND':
-            # Use Supertrend_Direction column which has 'BUY' or 'SELL'
-            st_direction = row.get('Supertrend_Direction', 'BUY')
+        elif regime_type in ['SUPERTREND', 'SUPERTREND_1D', 'SUPERTREND_1W', 'SUPERTREND_1M']:
+            # Use appropriate Supertrend_Direction column based on timeframe
+            # Map to correct column: SUPERTREND/SUPERTREND_1D -> Supertrend_Direction, others use suffix
+            if regime_type in ['SUPERTREND', 'SUPERTREND_1D']:
+                direction_col = 'Supertrend_Direction'
+            elif regime_type == 'SUPERTREND_1W':
+                direction_col = 'Supertrend_1W_Direction'
+            else:  # SUPERTREND_1M
+                direction_col = 'Supertrend_1M_Direction'
+            
+            st_direction = row.get(direction_col, 'BUY')
             if hasattr(st_direction, 'iloc'):
                 st_direction = st_direction.iloc[0]
             triggered = st_direction == 'SELL'
-            print(f"REGIME CHECK [{date}]: SuperTrend Direction={st_direction}, Triggered={triggered}")
+            print(f"REGIME CHECK [{date}]: {regime_type} Direction={st_direction}, Triggered={triggered}")
             if triggered:
                 return True, regime_config['action'], 0.0
         

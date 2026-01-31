@@ -218,7 +218,8 @@ class IndicatorLibrary:
         df['MACD_Signal'] = df['MACD'].ewm(span=9, adjust=False).mean()
         df['MACD_Diff'] = df['MACD'] - df['MACD_Signal']
         
-        # 3. SuperTrend (single default calculation for regime)
+        # 3. SuperTrend - Daily (1D), Weekly (1W), Monthly (1M) versions
+        # 3a. SuperTrend 1D (Daily - original)
         tr = np.maximum.reduce([
             (high - low).values,
             np.abs((high - close.shift(1)).fillna(0).values),
@@ -231,6 +232,91 @@ class IndicatorLibrary:
         supertrend = _compute_supertrend_fast(close.values, upper.values, lower.values)
         df['Supertrend'] = supertrend
         df['Supertrend_Direction'] = np.where(close.values > supertrend, 'BUY', 'SELL')
+        # Alias for 1D
+        df['Supertrend_1D'] = supertrend
+        df['Supertrend_1D_Direction'] = df['Supertrend_Direction']
+        
+        # 3b. SuperTrend 1W (Weekly)
+        # Resample to weekly OHLC
+        if df.index.name != 'Date':
+            df_temp = df.copy()
+            if 'Date' in df.columns:
+                df_temp = df_temp.set_index('Date')
+        else:
+            df_temp = df
+        
+        try:
+            weekly_ohlc = df_temp[['Open', 'High', 'Low', 'Close']].resample('W').agg({
+                'Open': 'first',
+                'High': 'max',
+                'Low': 'min',
+                'Close': 'last'
+            }).dropna()
+            
+            if len(weekly_ohlc) >= 10:
+                w_high = weekly_ohlc['High']
+                w_low = weekly_ohlc['Low']
+                w_close = weekly_ohlc['Close']
+                
+                w_tr = np.maximum.reduce([
+                    (w_high - w_low).values,
+                    np.abs((w_high - w_close.shift(1)).fillna(0).values),
+                    np.abs((w_low - w_close.shift(1)).fillna(0).values)
+                ])
+                w_atr = pd.Series(w_tr, index=weekly_ohlc.index).ewm(span=7).mean()
+                w_hl2 = (w_high + w_low) / 2
+                w_upper = w_hl2 + (3 * w_atr)
+                w_lower = w_hl2 - (3 * w_atr)
+                w_supertrend = _compute_supertrend_fast(w_close.values, w_upper.values, w_lower.values)
+                weekly_ohlc['Supertrend_1W'] = w_supertrend
+                weekly_ohlc['Supertrend_1W_Direction'] = np.where(w_close.values > w_supertrend, 'BUY', 'SELL')
+                
+                # Forward-fill to daily
+                df['Supertrend_1W'] = weekly_ohlc['Supertrend_1W'].reindex(df_temp.index, method='ffill')
+                df['Supertrend_1W_Direction'] = weekly_ohlc['Supertrend_1W_Direction'].reindex(df_temp.index, method='ffill')
+            else:
+                df['Supertrend_1W'] = df['Supertrend']
+                df['Supertrend_1W_Direction'] = df['Supertrend_Direction']
+        except Exception:
+            df['Supertrend_1W'] = df['Supertrend']
+            df['Supertrend_1W_Direction'] = df['Supertrend_Direction']
+        
+        # 3c. SuperTrend 1M (Monthly)
+        try:
+            monthly_ohlc = df_temp[['Open', 'High', 'Low', 'Close']].resample('ME').agg({
+                'Open': 'first',
+                'High': 'max',
+                'Low': 'min',
+                'Close': 'last'
+            }).dropna()
+            
+            if len(monthly_ohlc) >= 10:
+                m_high = monthly_ohlc['High']
+                m_low = monthly_ohlc['Low']
+                m_close = monthly_ohlc['Close']
+                
+                m_tr = np.maximum.reduce([
+                    (m_high - m_low).values,
+                    np.abs((m_high - m_close.shift(1)).fillna(0).values),
+                    np.abs((m_low - m_close.shift(1)).fillna(0).values)
+                ])
+                m_atr = pd.Series(m_tr, index=monthly_ohlc.index).ewm(span=7).mean()
+                m_hl2 = (m_high + m_low) / 2
+                m_upper = m_hl2 + (3 * m_atr)
+                m_lower = m_hl2 - (3 * m_atr)
+                m_supertrend = _compute_supertrend_fast(m_close.values, m_upper.values, m_lower.values)
+                monthly_ohlc['Supertrend_1M'] = m_supertrend
+                monthly_ohlc['Supertrend_1M_Direction'] = np.where(m_close.values > m_supertrend, 'BUY', 'SELL')
+                
+                # Forward-fill to daily
+                df['Supertrend_1M'] = monthly_ohlc['Supertrend_1M'].reindex(df_temp.index, method='ffill')
+                df['Supertrend_1M_Direction'] = monthly_ohlc['Supertrend_1M_Direction'].reindex(df_temp.index, method='ffill')
+            else:
+                df['Supertrend_1M'] = df['Supertrend']
+                df['Supertrend_1M_Direction'] = df['Supertrend_Direction']
+        except Exception:
+            df['Supertrend_1M'] = df['Supertrend']
+            df['Supertrend_1M_Direction'] = df['Supertrend_Direction']
         
         # 4. SMA and trend indicators
         df['SMA_200'] = close.rolling(200).mean()
