@@ -984,7 +984,14 @@ with main_tabs[0]:
                         # Check specific regime filter types
                         is_equity = regime_config and regime_config.get('type') == 'EQUITY'
                         is_equity_ma = regime_config and regime_config.get('type') == 'EQUITY_MA'
-                        is_other_regime = regime_config and regime_config.get('type') in ['EMA', 'MACD', 'SUPERTREND', 'DONCHIAN', 'SWING_ATR', 'BREADTH']
+                        # Include all MA and trend-based regime types (legacy + new timeframe variants)
+                        other_regime_types = [
+                            'EMA', 'MACD', 'SUPERTREND', 'DONCHIAN', 'SWING_ATR', 'BREADTH',
+                            'SMA_1D', 'SMA_1W', 'SMA_1M',
+                            'EMA_1D', 'EMA_1W', 'EMA_1M',
+                            'SUPERTREND_1D', 'SUPERTREND_1W', 'SUPERTREND_1M'
+                        ]
+                        is_other_regime = regime_config and regime_config.get('type') in other_regime_types
                         
                         # Equity Regime Testing tab - only for EQUITY filter
                         if is_equity and equity_analysis:
@@ -1491,8 +1498,9 @@ with main_tabs[0]:
                                 st.info("No trades available for Mone Carlo analysis. Run a backtest first.")
                         
                         # Equity Regime Testing Tab (only shown if EQUITY regime filter was used)
-                        if equity_analysis:
-                            with result_tabs[6]:  # Last tab
+                        if is_equity and equity_analysis:
+                            equity_tab_idx = 6  # Base 6 tabs (0-5), this is index 6
+                            with result_tabs[equity_tab_idx]:
                                 st.markdown("### 📊 Equity Regime Testing")
                                 st.warning("⚠️ **DISCLAIMER**: This section is for testing purposes only. The theoretical curve shows what would have happened WITHOUT the EQUITY regime filter.")
                                 
