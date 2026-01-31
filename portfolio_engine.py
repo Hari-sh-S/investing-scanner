@@ -974,7 +974,23 @@ class PortfolioEngine:
                 regime_data = yf.download(index_ticker, start=extended_start, end=self.end_date, progress=False)
                 if not regime_data.empty:
                     print(f"Downloaded {len(regime_data)} days of regime index data (with 400-day pre-buffer for EMA)")
-                    regime_data = IndicatorLibrary.add_regime_filters(regime_data)
+                    
+                    # Parse SuperTrend parameters if this is a SuperTrend regime filter
+                    st_period = 7  # default
+                    st_mult = 3    # default
+                    if regime_config.get('type', '').startswith('SUPERTREND'):
+                        st_value = regime_config.get('value', '7-3')
+                        if isinstance(st_value, str) and '-' in st_value:
+                            try:
+                                st_period, st_mult = map(float, st_value.split('-'))
+                                st_period = int(st_period)
+                                print(f"Using SuperTrend Period={st_period}, Multiplier={st_mult}")
+                            except:
+                                pass
+                    
+                    regime_data = IndicatorLibrary.add_regime_filters(regime_data, 
+                                                                       supertrend_period=st_period, 
+                                                                       supertrend_multiplier=st_mult)
                     
                     # Add Donchian channels if needed
                     if regime_config.get('type') == 'DONCHIAN':

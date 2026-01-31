@@ -381,10 +381,15 @@ with main_tabs[0]:
                 elif regime_type in ["SUPERTREND_1D", "SUPERTREND_1W", "SUPERTREND_1M"]:
                     timeframe_labels = {"SUPERTREND_1D": "Daily", "SUPERTREND_1W": "Weekly", "SUPERTREND_1M": "Monthly"}
                     st.caption(f"📊 SuperTrend on {timeframe_labels[regime_type]} timeframe")
-                    st_options = ["1-1", "1-2", "1-2.5"]
-                    saved_st = saved_regime.get('value', '1-2') if saved_regime.get('type', '').startswith('SUPERTREND') else '1-2'
-                    st_idx = st_options.index(saved_st) if saved_st in st_options else 1
-                    st_preset = st.selectbox("SuperTrend (Period-Multiplier)", st_options, index=st_idx)
+                    # Period-Multiplier: lower multiplier = more sensitive, higher = smoother
+                    st_options = ["7-2", "7-3", "10-2", "10-3"]
+                    saved_st = saved_regime.get('value', '7-3') if saved_regime.get('type', '').startswith('SUPERTREND') else '7-3'
+                    # Handle migration from old invalid values
+                    if saved_st not in st_options:
+                        saved_st = '7-3'
+                    st_idx = st_options.index(saved_st)
+                    st_preset = st.selectbox("SuperTrend (Period-Multiplier)", st_options, index=st_idx,
+                                            help="Period=ATR lookback, Multiplier=band width. Lower multiplier = more signals")
                     regime_value = st_preset
                 elif regime_type == "EQUITY":
                     eq_col1, eq_col2 = st.columns(2)
