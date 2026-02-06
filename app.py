@@ -599,6 +599,98 @@ with main_tabs[0]:
                     }
             else:
                 uncorrelated_config = None
+        
+        # Risk Management section (within col_config)
+        with st.expander("⚠️ Risk Management", expanded=False):
+            st.caption("Control drawdowns at portfolio and trade level")
+            
+            # Get saved risk config
+            saved_risk = loaded_config.get('risk_config', {}) or {}
+            saved_portfolio_risk = saved_risk.get('portfolio', {}) or {}
+            saved_trade_risk = saved_risk.get('trade', {}) or {}
+            
+            # Portfolio Level Risk
+            st.markdown("**Portfolio Level**")
+            enable_portfolio_risk = st.checkbox("Enable Portfolio Risk", 
+                                                 value=saved_portfolio_risk.get('enabled', False),
+                                                 help="Exit when total portfolio loss exceeds threshold")
+            
+            portfolio_risk_config = {'enabled': False}
+            if enable_portfolio_risk:
+                port_cols = st.columns(2)
+                with port_cols[0]:
+                    port_type_options = ["Percentage (%)", "Absolute (₹)"]
+                    saved_port_type = saved_portfolio_risk.get('type', 'percent')
+                    port_type_idx = 0 if saved_port_type == 'percent' else 1
+                    port_risk_type = st.selectbox("Risk Type", port_type_options, index=port_type_idx, key="port_risk_type")
+                with port_cols[1]:
+                    if port_risk_type == "Percentage (%)":
+                        saved_port_val = saved_portfolio_risk.get('value', 2.0) if saved_portfolio_risk.get('type') == 'percent' else 2.0
+                        port_risk_value = st.number_input("Risk %", 0.5, 20.0, float(saved_port_val), step=0.5, key="port_risk_val")
+                    else:
+                        saved_port_val = saved_portfolio_risk.get('value', 5000) if saved_portfolio_risk.get('type') == 'absolute' else 5000
+                        port_risk_value = st.number_input("Risk ₹", 1000, 100000, int(saved_port_val), step=1000, key="port_risk_val")
+                
+                port_action_options = ["Exit all positions", "Exit only loss-making positions"]
+                saved_port_action = saved_portfolio_risk.get('action', 'exit_losers')
+                port_action_idx = 0 if saved_port_action == 'exit_all' else 1
+                port_exit_action = st.selectbox("Exit Action", port_action_options, index=port_action_idx, key="port_exit_action",
+                                                help="Exit all: nuclear option | Exit losers: keep profitable positions")
+                
+                portfolio_risk_config = {
+                    'enabled': True,
+                    'type': 'percent' if port_risk_type == "Percentage (%)" else 'absolute',
+                    'value': port_risk_value,
+                    'action': 'exit_all' if port_exit_action == "Exit all positions" else 'exit_losers'
+                }
+            
+            st.markdown("---")
+            
+            # Trade Level Risk
+            st.markdown("**Trade Level**")
+            enable_trade_risk = st.checkbox("Enable Trade Risk", 
+                                            value=saved_trade_risk.get('enabled', False),
+                                            help="Exit when individual trade loss exceeds threshold")
+            
+            trade_risk_config = {'enabled': False}
+            if enable_trade_risk:
+                trade_cols = st.columns(2)
+                with trade_cols[0]:
+                    trade_type_options = ["Percentage (%)", "Absolute (₹)"]
+                    saved_trade_type = saved_trade_risk.get('type', 'percent')
+                    trade_type_idx = 0 if saved_trade_type == 'percent' else 1
+                    trade_risk_type = st.selectbox("Risk Type", trade_type_options, index=trade_type_idx, key="trade_risk_type")
+                with trade_cols[1]:
+                    if trade_risk_type == "Percentage (%)":
+                        saved_trade_val = saved_trade_risk.get('value', 2.0) if saved_trade_risk.get('type') == 'percent' else 2.0
+                        trade_risk_value = st.number_input("Risk %", 0.5, 20.0, float(saved_trade_val), step=0.5, key="trade_risk_val")
+                    else:
+                        saved_trade_val = saved_trade_risk.get('value', 5000) if saved_trade_risk.get('type') == 'absolute' else 5000
+                        trade_risk_value = st.number_input("Risk ₹", 1000, 100000, int(saved_trade_val), step=1000, key="trade_risk_val")
+                
+                trade_action_options = ["Exit only breached trade", "Exit all loss-making", "Exit all positions"]
+                saved_trade_action = saved_trade_risk.get('action', 'exit_breached')
+                trade_action_map = {'exit_breached': 0, 'exit_losers': 1, 'exit_all': 2}
+                trade_action_idx = trade_action_map.get(saved_trade_action, 0)
+                trade_exit_action = st.selectbox("Exit Action", trade_action_options, index=trade_action_idx, key="trade_exit_action",
+                                                 help="Breached only: exit just the stock | All losers: exit all losing positions | All: nuclear")
+                
+                trade_action_reverse = {0: 'exit_breached', 1: 'exit_losers', 2: 'exit_all'}
+                trade_risk_config = {
+                    'enabled': True,
+                    'type': 'percent' if trade_risk_type == "Percentage (%)" else 'absolute',
+                    'value': trade_risk_value,
+                    'action': trade_action_reverse[trade_action_options.index(trade_exit_action)]
+                }
+            
+            risk_config = {
+                'portfolio': portfolio_risk_config,
+                'trade': trade_risk_config
+            }
+        
+        # Default risk_config when expander is collapsed but no config saved
+        if 'risk_config' not in dir():
+            risk_config = {'portfolio': {'enabled': False}, 'trade': {'enabled': False}}
     
     with col_scoring:
         st.subheader("Scoring Console")
@@ -719,6 +811,7 @@ with main_tabs[0]:
                                 'regime_config': regime_config,
                                 'use_uncorrelated': use_uncorrelated,
                                 'uncorrelated_config': uncorrelated_config,
+                                'risk_config': risk_config,
                                 'formula': formula,
                                 'template': template
                             }
@@ -831,7 +924,8 @@ with main_tabs[0]:
                             uncorrelated_config,
                             reinvest_profits,
                             position_sizing_config,
-                            historical_universe_config=historical_universe_config
+                            historical_universe_config=historical_universe_config,
+                            risk_config=risk_config
                         )
                         metrics = engine.get_metrics()
                         

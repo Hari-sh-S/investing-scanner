@@ -635,6 +635,125 @@ class PortfolioEngine:
         
         return False
 
+    def _check_risk_management(self, date, holdings, entry_prices, risk_config):
+        """
+        Check portfolio and trade level risk triggers using daily Low as intraday proxy.
+        
+        Args:
+            date: Current date
+            holdings: {ticker: shares}
+            entry_prices: {ticker: cost_basis per share}
+            risk_config: {'portfolio': {...}, 'trade': {...}}
+        
+        Returns:
+            (triggered: bool, tickers_to_exit: list, trigger_reason: str)
+        """
+        if not risk_config:
+            return False, [], ""
+        
+        portfolio_config = risk_config.get('portfolio', {})
+        trade_config = risk_config.get('trade', {})
+        
+        if not portfolio_config.get('enabled') and not trade_config.get('enabled'):
+            return False, [], ""
+        
+        if not holdings:
+            return False, [], ""
+        
+        # Calculate current values using daily LOW as worst-case intraday proxy
+        position_losses = {}  # {ticker: (loss_amount, current_value, is_losing)}
+        total_loss = 0
+        total_invested = 0
+        losing_tickers = []
+        
+        for ticker, shares in holdings.items():
+            if ticker not in self.data or shares <= 0:
+                continue
+            
+            df = self.data[ticker]
+            if date not in df.index:
+                continue
+            
+            entry_price = entry_prices.get(ticker, 0)
+            if entry_price <= 0:
+                continue
+            
+            # Use daily LOW as worst-case intraday price
+            row = df.loc[date]
+            low_price = row['Low'] if 'Low' in row.index else row['Close']
+            if hasattr(low_price, 'iloc'):
+                low_price = low_price.iloc[0]
+            
+            position_value = shares * low_price
+            cost_basis = shares * entry_price
+            loss = cost_basis - position_value  # Positive = loss, Negative = profit
+            
+            position_losses[ticker] = {
+                'loss': loss,
+                'cost': cost_basis,
+                'current': position_value,
+                'is_losing': loss > 0
+            }
+            
+            if loss > 0:
+                total_loss += loss
+                losing_tickers.append(ticker)
+            
+            total_invested += cost_basis
+        
+        tickers_to_exit = []
+        trigger_reason = ""
+        
+        # Check Portfolio-level risk
+        if portfolio_config.get('enabled') and total_invested > 0:
+            threshold = portfolio_config['value']
+            if portfolio_config['type'] == 'percent':
+                threshold = total_invested * (portfolio_config['value'] / 100)
+            
+            if total_loss >= threshold:
+                action = portfolio_config.get('action', 'exit_losers')
+                if action == 'exit_all':
+                    tickers_to_exit = list(holdings.keys())
+                    trigger_reason = f"Portfolio loss ₹{total_loss:,.0f} exceeded threshold ₹{threshold:,.0f}"
+                else:  # exit_losers
+                    tickers_to_exit = losing_tickers.copy()
+                    trigger_reason = f"Portfolio loss ₹{total_loss:,.0f} exceeded threshold - exiting losers"
+                
+                print(f"RISK [{date}]: {trigger_reason}")
+                return True, tickers_to_exit, trigger_reason
+        
+        # Check Trade-level risk
+        if trade_config.get('enabled'):
+            breached_tickers = []
+            
+            for ticker, data in position_losses.items():
+                if not data['is_losing']:
+                    continue
+                
+                threshold = trade_config['value']
+                if trade_config['type'] == 'percent':
+                    threshold = data['cost'] * (trade_config['value'] / 100)
+                
+                if data['loss'] >= threshold:
+                    breached_tickers.append(ticker)
+                    print(f"RISK [{date}]: {ticker} loss ₹{data['loss']:,.0f} exceeded threshold ₹{threshold:,.0f}")
+            
+            if breached_tickers:
+                action = trade_config.get('action', 'exit_breached')
+                if action == 'exit_all':
+                    tickers_to_exit = list(holdings.keys())
+                    trigger_reason = f"Trade risk breached on {breached_tickers} - exiting all"
+                elif action == 'exit_losers':
+                    tickers_to_exit = losing_tickers.copy()
+                    trigger_reason = f"Trade risk breached on {breached_tickers} - exiting all losers"
+                else:  # exit_breached
+                    tickers_to_exit = breached_tickers.copy()
+                    trigger_reason = f"Trade risk breached - exiting {breached_tickers}"
+                
+                return True, tickers_to_exit, trigger_reason
+        
+        return False, [], ""
+
     def _check_regime_filter(self, date, regime_config, current_equity=0, peak_equity=0):
         """Check if regime filter is triggered.
         
@@ -935,7 +1054,7 @@ class PortfolioEngine:
     def run_rebalance_strategy(self, scoring_formula, num_stocks, exit_rank, 
                               rebal_config, regime_config=None, uncorrelated_config=None, 
                               reinvest_profits=True, position_sizing_config=None,
-                              historical_universe_config=None):
+                              historical_universe_config=None, risk_config=None):
         """
         Advanced backtesting engine with all Sigma Scanner features.
         
@@ -943,6 +1062,7 @@ class PortfolioEngine:
                                score_weighted, risk_parity), 'use_cap' (bool), 'max_pct' (int)
         historical_universe_config: dict with 'enabled' (bool), 'universe_name' (str)
                                    If enabled, uses point-in-time index constituents
+        risk_config: dict with 'portfolio' and 'trade' sub-configs for intraday risk management
         """
         if not self.data:
             print("No data available")
@@ -1061,10 +1181,12 @@ class PortfolioEngine:
         # Initialize portfolio
         cash = self.initial_capital
         holdings = {}  # {ticker: shares}
+        entry_prices = {}  # {ticker: cost_basis_per_share} for risk management
         portfolio_history = []
         regime_active = False
         regime_cash_reserve = 0
         last_known_prices = {}  # Track last known prices for holdings (for data gaps)
+        risk_events = []  # Track risk management exits
         
         # EQUITY regime filter tracking
         peak_equity = self.initial_capital  # Track highest ACTUAL equity reached
@@ -1134,6 +1256,45 @@ class PortfolioEngine:
             # Update peak equity (only when not in equity regime active mode)
             if not equity_regime_active and current_equity > peak_equity:
                 peak_equity = current_equity
+            
+            # RISK MANAGEMENT: Check portfolio/trade level risk (on every day)
+            if risk_config and holdings and not equity_regime_active and not regime_active:
+                risk_triggered, tickers_to_exit, trigger_reason = self._check_risk_management(
+                    date, holdings, entry_prices, risk_config
+                )
+                
+                if risk_triggered and tickers_to_exit:
+                    # Execute risk exits
+                    for exit_ticker in tickers_to_exit:
+                        if exit_ticker in holdings:
+                            exit_shares = holdings[exit_ticker]
+                            if exit_ticker in self.data and date in self.data[exit_ticker].index:
+                                sell_price = self._get_scalar(self.data[exit_ticker].loc[date, 'Close'])
+                                proceeds = exit_shares * sell_price
+                                cash += proceeds
+                                
+                                self.trades.append({
+                                    'Date': date,
+                                    'Ticker': exit_ticker,
+                                    'Action': 'SELL',
+                                    'Shares': exit_shares,
+                                    'Price': sell_price,
+                                    'Value': proceeds,
+                                    'Score': 0,
+                                    'Rank': 0,
+                                    'Reason': 'RISK_EXIT'
+                                })
+                                
+                                del holdings[exit_ticker]
+                                if exit_ticker in entry_prices:
+                                    del entry_prices[exit_ticker]
+                    
+                    # Track risk event
+                    risk_events.append({
+                        'date': date,
+                        'reason': trigger_reason,
+                        'tickers_exited': tickers_to_exit.copy()
+                    })
             
             # EQUITY REGIME: Check for mid-day drawdown breach (on any day, not just rebalance)
             if is_equity_regime and not equity_regime_active and holdings:
@@ -1631,6 +1792,7 @@ class PortfolioEngine:
                             cost = shares * buy_price
                             cash -= cost
                             holdings[ticker] = shares
+                            entry_prices[ticker] = buy_price  # Track for risk management
                             
                             self.trades.append({
                                 'Date': date,
