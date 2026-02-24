@@ -2,9 +2,14 @@ name: Keep Streamlit App Alive
 
 on:
   schedule:
-    # Runs every 15 minutes (more aggressive to prevent sleeping)
-    - cron: '*/15 * * * *'
-  workflow_dispatch:  # Allows manual trigger from GitHub Actions UI
+    # Every 30 minutes - stays well within GitHub's 2000 free minutes/month
+    - cron: '*/30 * * * *'
+  # Allow manual trigger from GitHub Actions UI
+  workflow_dispatch:
+  # Also triggers on push - prevents GitHub auto-disabling after 60 days of no pushes
+  push:
+    branches:
+      - main
 
 jobs:
   ping:
@@ -12,9 +17,11 @@ jobs:
     steps:
       - name: Ping Streamlit App
         run: |
-          echo "Pinging Streamlit app to keep it alive (every 15 mins)..."
-          # -L follows redirects, -s silent, -w output status code
-          # Change this URL if your app URL is different
-          curl -L -s -o /dev/null -w "%{http_code}" https://investing-scanner.streamlit.app || true
-          echo ""
-          echo "Ping completed at $(date)"
+          echo "Pinging app at $(date)"
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://vesting-scanner.streamlit.app/)
+          echo "HTTP Status: $STATUS"
+          if [ "$STATUS" -ge 200 ] && [ "$STATUS" -lt 400 ]; then
+            echo "✅ App is alive"
+          else
+            echo "⚠️ App returned status $STATUS"
+          fi
