@@ -18,7 +18,7 @@ jobs:
       - name: Ping Streamlit App
         run: |
           echo "Pinging app at $(date)"
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://vesting-scanner.streamlit.app/)
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://investing-scanner.streamlit.app/)
           echo "HTTP Status: $STATUS"
           if [ "$STATUS" -ge 200 ] && [ "$STATUS" -lt 400 ]; then
             echo "✅ App is alive"
