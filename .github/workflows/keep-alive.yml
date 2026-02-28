@@ -2,11 +2,9 @@ name: Keep Streamlit App Alive
 
 on:
   schedule:
-    # Every 30 minutes - stays well within GitHub's 2000 free minutes/month
+    # Every 30 minutes to prevent the app from sleeping
     - cron: '*/30 * * * *'
-  # Allow manual trigger from GitHub Actions UI
   workflow_dispatch:
-  # Also triggers on push - prevents GitHub auto-disabling after 60 days of no pushes
   push:
     branches:
       - main
@@ -15,11 +13,45 @@ jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping Streamlit App
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          
+      - name: Install dependencies
+        run: pip install selenium webdriver-manager
+
+      - name: Ping App with Headless Browser
         run: |
-          echo "Pinging https://investing-scanner.streamlit.app/ at $(date)"
-          curl -s -L --max-time 30 \
-               -o /dev/null \
-               -w "HTTP Status: %{http_code}\n" \
-               https://investing-scanner.streamlit.app/ || true
-          echo "✅ Ping complete"
+          python -c "
+          from selenium import webdriver
+          from selenium.webdriver.chrome.options import Options
+          from selenium.webdriver.chrome.service import Service
+          from webdriver_manager.chrome import ChromeDriverManager
+          import time
+
+          print('Configuring headless Chrome...')
+          options = Options()
+          options.add_argument('--headless')
+          options.add_argument('--no-sandbox')
+          options.add_argument('--disable-dev-shm-usage')
+          options.add_argument('--window-size=1920,1080')
+          
+          # Initialize driver
+          driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+          
+          try:
+              print('Navigating to app...')
+              driver.get('https://investing-scanner.streamlit.app/')
+              
+              # Wait 15 seconds to ensure JavaScript executes and WebSocket connects
+              print('Waiting for Streamlit WebSocket to connect...')
+              time.sleep(15)
+              
+              print('Successfully loaded app. Page title:', driver.title)
+          except Exception as e:
+              print('Error occurred:', e)
+          finally:
+              driver.quit()
+              print('Browser closed.')
+          "
