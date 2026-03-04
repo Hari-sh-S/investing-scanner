@@ -1,3 +1,14 @@
+---
+title: Investing Scanner
+emoji: 📊
+colorFrom: red
+colorTo: blue
+sdk: streamlit
+sdk_version: "1.41.1"
+app_file: app.py
+pinned: true
+---
+
 # 📊 Investing Scanner
 
 An advanced backtesting platform for the Indian Stock Market, built with Streamlit. Analyze portfolios, test strategies, and optimize your trading approach using real NSE data.
